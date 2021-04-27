@@ -7,9 +7,14 @@ type Message struct {
 	Data   []byte
 }
 
+type PublishRequest struct {
+	Message      *Message
+	ResponseChan chan uint64
+}
+
 type PubSub struct {
 	Alive         bool
-	MessageChan   chan *Message
+	MessageChan   chan *PublishRequest
 	SubscribeChan chan *Subscriber
 	Subscribers   map[string]map[*Subscriber]bool
 }
@@ -17,8 +22,8 @@ type PubSub struct {
 func New() *PubSub {
 	return &PubSub{
 		Alive:         true,
-		MessageChan:   make(chan *Message, 256),
-		SubscribeChan: make(chan *Subscriber, 256),
+		MessageChan:   make(chan *PublishRequest, 1),
+		SubscribeChan: make(chan *Subscriber, 1),
 		Subscribers:   make(map[string]map[*Subscriber]bool),
 	}
 }
@@ -33,20 +38,25 @@ func (p *PubSub) Start(ctx context.Context) {
 			p.Alive = false
 			return
 
-		case m := <-p.MessageChan:
+		case req := <-p.MessageChan:
 
-			for i := 0; i < len(m.Topics); i++ {
+			var publishedOn uint64
 
-				subs, ok := p.Subscribers[m.Topics[i]]
+			for i := 0; i < len(req.Message.Topics); i++ {
+
+				subs, ok := p.Subscribers[req.Message.Topics[i]]
 				if !ok {
 					continue
 				}
 
 				for sub := range subs {
-					sub.Channel <- m.Data
+					sub.Channel <- req.Message.Data
+					publishedOn++
 				}
 
 			}
+
+			req.ResponseChan <- publishedOn
 
 		case sub := <-p.SubscribeChan:
 
@@ -69,14 +79,18 @@ func (p *PubSub) Start(ctx context.Context) {
 
 }
 
-func (p *PubSub) Publish(msg *Message) bool {
+func (p *PubSub) Publish(msg *Message) (bool, uint64) {
 
 	if p.Alive {
-		p.MessageChan <- msg
-		return true
+
+		resChan := make(chan uint64)
+		p.MessageChan <- &PublishRequest{Message: msg, ResponseChan: resChan}
+
+		return true, <-resChan
+
 	}
 
-	return false
+	return false, 0
 
 }
 
