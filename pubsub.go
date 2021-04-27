@@ -13,18 +13,24 @@ type PublishRequest struct {
 }
 
 type PubSub struct {
-	Alive         bool
-	MessageChan   chan *PublishRequest
-	SubscribeChan chan *Subscriber
-	Subscribers   map[string]map[*Subscriber]bool
+	Alive            bool
+	Index            uint64
+	MessageChan      chan *PublishRequest
+	SubscriberIdChan chan chan uint64
+	SubscribeChan    chan *Subscriber
+	UnsubscribeChan  chan string
+	Subscribers      map[string]map[uint64]chan *PublishedMessage
 }
 
 func New() *PubSub {
 	return &PubSub{
-		Alive:         true,
-		MessageChan:   make(chan *PublishRequest, 1),
-		SubscribeChan: make(chan *Subscriber, 1),
-		Subscribers:   make(map[string]map[*Subscriber]bool),
+		Alive:            true,
+		Index:            1,
+		MessageChan:      make(chan *PublishRequest, 1),
+		SubscriberIdChan: make(chan chan uint64, 1),
+		SubscribeChan:    make(chan *Subscriber, 1),
+		UnsubscribeChan:  make(chan string, 1),
+		Subscribers:      make(map[string]map[uint64]chan *PublishedMessage),
 	}
 }
 
@@ -50,15 +56,15 @@ func (p *PubSub) Start(ctx context.Context) {
 					continue
 				}
 
-				for sub := range subs {
+				for _, sub := range subs {
 
 					msg := PublishedMessage{
 						Data:  req.Message.Data,
 						Topic: topic,
 					}
 
-					if len(sub.Channel) < cap(sub.Channel) {
-						sub.Channel <- &msg
+					if len(sub) < cap(sub) {
+						sub <- &msg
 						publishedOn++
 					}
 
@@ -68,18 +74,23 @@ func (p *PubSub) Start(ctx context.Context) {
 
 			req.ResponseChan <- publishedOn
 
+		case req := <-p.SubscriberIdChan:
+
+			req <- p.Index
+			p.Index++
+
 		case sub := <-p.SubscribeChan:
 
 			for topic := range sub.Topics {
 
 				subs, ok := p.Subscribers[topic]
 				if !ok {
-					p.Subscribers[topic] = make(map[*Subscriber]bool)
-					p.Subscribers[topic][sub] = true
+					p.Subscribers[topic] = make(map[uint64]chan *PublishedMessage)
+					p.Subscribers[topic][sub.Id] = sub.Channel
 					continue
 				}
 
-				subs[sub] = true
+				subs[sub.Id] = sub.Channel
 
 			}
 
@@ -108,7 +119,11 @@ func (p *PubSub) Subscribe(cap uint64, topics ...string) *Subscriber {
 
 	if p.Alive {
 
+		idGenChan := make(chan uint64)
+		p.SubscriberIdChan <- idGenChan
+
 		sub := &Subscriber{
+			Id:      <-idGenChan,
 			Channel: make(chan *PublishedMessage, cap),
 			Topics:  make(map[string]bool),
 		}

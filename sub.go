@@ -6,6 +6,7 @@ type PublishedMessage struct {
 }
 
 type Subscriber struct {
+	Id      uint64
 	Channel chan *PublishedMessage
 	Topics  map[string]bool
 }
