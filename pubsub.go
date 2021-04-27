@@ -213,10 +213,28 @@ func (p *PubSub) AddSubscription(subscriber *Subscriber, topics ...string) (bool
 func (p *PubSub) Unsubscribe(subscriber *Subscriber, topics ...string) (bool, uint64) {
 
 	if p.Alive {
+
+		_topics := make([]string, 0, len(topics))
+		for i := 0; i < len(_topics); i++ {
+
+			if state, ok := subscriber.Topics[topics[i]]; ok {
+				if state {
+					_topics = append(_topics, topics[i])
+					subscriber.Topics[topics[i]] = false
+				}
+			}
+
+		}
+
 		resChan := make(chan uint64)
-		p.UnsubscribeChan <- &UnsubscriptionRequest{Id: subscriber.Id, Topics: topics, ResponseChan: resChan}
+		p.UnsubscribeChan <- &UnsubscriptionRequest{
+			Id:           subscriber.Id,
+			Topics:       _topics,
+			ResponseChan: resChan,
+		}
 
 		return true, <-resChan
+
 	}
 
 	return false, 0
