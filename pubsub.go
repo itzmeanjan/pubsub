@@ -44,13 +44,14 @@ func (p *PubSub) Start(ctx context.Context) {
 
 			for i := 0; i < len(req.Message.Topics); i++ {
 
-				subs, ok := p.Subscribers[req.Message.Topics[i]]
+				topic := req.Message.Topics[i]
+				subs, ok := p.Subscribers[topic]
 				if !ok {
 					continue
 				}
 
 				for sub := range subs {
-					sub.Channel <- req.Message.Data
+					sub.Channel <- &PublishedMessage{Data: req.Message.Data, Topic: topic}
 					publishedOn++
 				}
 
@@ -99,7 +100,7 @@ func (p *PubSub) Subscribe(cap uint64, topics ...string) *Subscriber {
 	if p.Alive {
 
 		sub := &Subscriber{
-			Channel: make(chan []byte, cap),
+			Channel: make(chan *PublishedMessage, cap),
 			Topics:  make(map[string]bool),
 		}
 
