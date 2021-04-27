@@ -240,3 +240,27 @@ func (p *PubSub) Unsubscribe(subscriber *Subscriber, topics ...string) (bool, ui
 	return false, 0
 
 }
+
+func (p *PubSub) UnsubscribeAll(subscriber *Subscriber) (bool, uint64) {
+
+	if p.Alive {
+
+		topics := make([]string, len(subscriber.Topics))
+		for topic := range subscriber.Topics {
+			topics = append(topics, topic)
+		}
+
+		resChan := make(chan uint64)
+		p.UnsubscribeChan <- &UnsubscriptionRequest{
+			Id:           subscriber.Id,
+			Topics:       topics,
+			ResponseChan: resChan,
+		}
+
+		return true, <-resChan
+
+	}
+
+	return false, 0
+
+}
