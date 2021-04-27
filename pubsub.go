@@ -18,7 +18,7 @@ type PubSub struct {
 	MessageChan      chan *PublishRequest
 	SubscriberIdChan chan chan uint64
 	SubscribeChan    chan *Subscriber
-	UnsubscribeChan  chan string
+	UnsubscribeChan  chan *UnsubscriptionRequest
 	Subscribers      map[string]map[uint64]chan *PublishedMessage
 }
 
@@ -29,7 +29,7 @@ func New() *PubSub {
 		MessageChan:      make(chan *PublishRequest, 1),
 		SubscriberIdChan: make(chan chan uint64, 1),
 		SubscribeChan:    make(chan *Subscriber, 1),
-		UnsubscribeChan:  make(chan string, 1),
+		UnsubscribeChan:  make(chan *UnsubscriptionRequest, 1),
 		Subscribers:      make(map[string]map[uint64]chan *PublishedMessage),
 	}
 }
@@ -92,6 +92,16 @@ func (p *PubSub) Start(ctx context.Context) {
 
 				if _, ok := subs[sub.Id]; !ok {
 					subs[sub.Id] = sub.Channel
+				}
+
+			}
+
+		case req := <-p.UnsubscribeChan:
+
+			for i := 0; i < len(req.Topics); i++ {
+
+				if subs, ok := p.Subscribers[req.Topics[i]]; ok {
+					delete(subs, req.Id)
 				}
 
 			}
@@ -168,6 +178,17 @@ func (p *PubSub) AddSubscription(cap uint64, subscriber *Subscriber, topics ...s
 		p.SubscribeChan <- _subscriber
 		return true
 
+	}
+
+	return false
+
+}
+
+func (p *PubSub) Unsubscribe(subscriber *Subscriber, topics ...string) bool {
+
+	if p.Alive {
+		p.UnsubscribeChan <- &UnsubscriptionRequest{Id: subscriber.Id, Topics: topics}
+		return true
 	}
 
 	return false
