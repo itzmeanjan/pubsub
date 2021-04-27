@@ -90,7 +90,9 @@ func (p *PubSub) Start(ctx context.Context) {
 					continue
 				}
 
-				subs[sub.Id] = sub.Channel
+				if _, ok := subs[sub.Id]; !ok {
+					subs[sub.Id] = sub.Channel
+				}
 
 			}
 
@@ -138,5 +140,36 @@ func (p *PubSub) Subscribe(cap uint64, topics ...string) *Subscriber {
 	}
 
 	return nil
+
+}
+
+func (p *PubSub) AddSubscription(cap uint64, subscriber *Subscriber, topics ...string) bool {
+
+	if p.Alive {
+
+		_subscriber := &Subscriber{
+			Id:      subscriber.Id,
+			Channel: subscriber.Channel,
+			Topics:  make(map[string]bool),
+		}
+
+		for i := 0; i < len(topics); i++ {
+
+			if state, ok := subscriber.Topics[topics[i]]; ok {
+				if state {
+					continue
+				}
+			}
+
+			_subscriber.Topics[topics[i]] = true
+
+		}
+
+		p.SubscribeChan <- _subscriber
+		return true
+
+	}
+
+	return false
 
 }
