@@ -51,8 +51,17 @@ func (p *PubSub) Start(ctx context.Context) {
 				}
 
 				for sub := range subs {
-					sub.Channel <- &PublishedMessage{Data: req.Message.Data, Topic: topic}
-					publishedOn++
+
+					msg := PublishedMessage{
+						Data:  req.Message.Data,
+						Topic: topic,
+					}
+
+					if len(sub.Channel) < cap(sub.Channel) {
+						sub.Channel <- &msg
+						publishedOn++
+					}
+
 				}
 
 			}
