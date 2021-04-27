@@ -8,13 +8,15 @@ type Message struct {
 }
 
 type PubSub struct {
-	Message     <-chan Message
+	Alive       bool
+	Message     chan *Message
 	Subscribers map[string][]*Subscriber
 }
 
 func New() *PubSub {
 	return &PubSub{
-		Message:     make(<-chan Message, 256),
+		Alive:       true,
+		Message:     make(chan *Message, 256),
 		Subscribers: make(map[string][]*Subscriber),
 	}
 }
@@ -26,6 +28,7 @@ func (p *PubSub) Start(ctx context.Context) {
 		select {
 
 		case <-ctx.Done():
+			p.Alive = false
 			return
 
 		case m := <-p.Message:
@@ -47,4 +50,13 @@ func (p *PubSub) Start(ctx context.Context) {
 
 	}
 
+}
+
+func (p *PubSub) Publish(msg *Message) bool {
+	if p.Alive {
+		p.Message <- msg
+		return true
+	}
+
+	return false
 }
