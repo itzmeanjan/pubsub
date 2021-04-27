@@ -2,16 +2,6 @@ package pubsub
 
 import "context"
 
-type Message struct {
-	Topics []string
-	Data   []byte
-}
-
-type PublishRequest struct {
-	Message      *Message
-	ResponseChan chan uint64
-}
-
 type PubSub struct {
 	Alive            bool
 	Index            uint64
