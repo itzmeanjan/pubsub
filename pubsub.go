@@ -2,6 +2,10 @@ package pubsub
 
 import "context"
 
+// PubSub - Pub/Sub Server i.e. holds which clients are subscribed to what topics,
+// manages publishing messages to correct topics, handles (un-)subscription requests
+//
+// In other words state manager of Pub/Sub system
 type PubSub struct {
 	Alive            bool
 	Index            uint64
@@ -12,6 +16,8 @@ type PubSub struct {
 	Subscribers      map[string]map[uint64]chan *PublishedMessage
 }
 
+// New - Create a new Pub/Sub hub, using which messages
+// can be routed to various topics
 func New() *PubSub {
 	return &PubSub{
 		Alive:            true,
@@ -24,6 +30,8 @@ func New() *PubSub {
 	}
 }
 
+// Start - Handles request from publishers & subscribers, so that
+// message publishing can be abstracted
 func (p *PubSub) Start(ctx context.Context) {
 
 	for {
@@ -53,6 +61,8 @@ func (p *PubSub) Start(ctx context.Context) {
 						Topic: topic,
 					}
 
+					// Checking whether receiver channel has enough buffer space
+					// to hold this message or not
 					if len(sub) < cap(sub) {
 						sub <- &msg
 						publishedOn++
@@ -67,6 +77,7 @@ func (p *PubSub) Start(ctx context.Context) {
 		case req := <-p.SubscriberIdChan:
 
 			req <- p.Index
+			// Next subscriber identifier, always monotonically incremented
 			p.Index++
 
 		case req := <-p.SubscribeChan:
@@ -119,6 +130,10 @@ func (p *PubSub) Start(ctx context.Context) {
 
 }
 
+// Publish - Publish message to N-many topics, receives how many of
+// subscribers are receiving ( will receive ) copy of this message
+//
+// Response will only be negative if Pub/Sub system has stopped running
 func (p *PubSub) Publish(msg *Message) (bool, uint64) {
 
 	if p.Alive {
@@ -134,6 +149,12 @@ func (p *PubSub) Publish(msg *Message) (bool, uint64) {
 
 }
 
+// Subscribe - Subscribes to topics for first time, new client gets created
+//
+// Use this client to add more subscriptions to topics/ unsubscribe from topics/
+// receive published messages etc.
+//
+// Response will only be nil if Pub/Sub system has stopped running
 func (p *PubSub) Subscribe(cap uint64, topics ...string) *Subscriber {
 
 	if p.Alive {
@@ -153,6 +174,7 @@ func (p *PubSub) Subscribe(cap uint64, topics ...string) *Subscriber {
 
 		resChan := make(chan uint64)
 		p.SubscribeChan <- &SubscriptionRequest{Subscriber: sub, ResponseChan: resChan}
+		// Intentionally being ignored
 		<-resChan
 
 		return sub
@@ -163,6 +185,9 @@ func (p *PubSub) Subscribe(cap uint64, topics ...string) *Subscriber {
 
 }
 
+// AddSubscription - Use existing subscriber client to subscribe to more topics
+//
+// Response will only be negative if Pub/Sub system has stopped running
 func (p *PubSub) AddSubscription(subscriber *Subscriber, topics ...string) (bool, uint64) {
 
 	if p.Alive {
@@ -200,6 +225,9 @@ func (p *PubSub) AddSubscription(subscriber *Subscriber, topics ...string) (bool
 
 }
 
+// Unsubscribe - Unsubscribes from topics for specified subscriber client
+//
+// Response will only be negative if Pub/Sub system has stopped running
 func (p *PubSub) Unsubscribe(subscriber *Subscriber, topics ...string) (bool, uint64) {
 
 	if p.Alive {
@@ -231,13 +259,21 @@ func (p *PubSub) Unsubscribe(subscriber *Subscriber, topics ...string) (bool, ui
 
 }
 
+// UnsubscribeAll - All current active subscriptions get unsubscribed from
+//
+// Response will only be negative if Pub/Sub system has stopped running
 func (p *PubSub) UnsubscribeAll(subscriber *Subscriber) (bool, uint64) {
 
 	if p.Alive {
 
-		topics := make([]string, len(subscriber.Topics))
-		for topic := range subscriber.Topics {
-			topics = append(topics, topic)
+		topics := make([]string, 0, len(subscriber.Topics))
+		for topic, ok := range subscriber.Topics {
+
+			if ok {
+				topics = append(topics, topic)
+				subscriber.Topics[topic] = false
+			}
+
 		}
 
 		resChan := make(chan uint64)
