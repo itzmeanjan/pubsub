@@ -20,4 +20,21 @@ Multiple | ✅ | ✅
 
 ## Usage
 
-Here's an [example](./example/main.go)
+First create a Go project with **GOMOD** support.
+
+```bash
+mkdir test_pubsub
+
+cd test_pubsub
+go mod init github.com/<username>/test_pubsub
+
+touch main.go
+```
+
+Now add `github.com/itzmeanjan/pubsub` as your project dependency
+
+```bash
+go get github.com/itzmeanjan/pubsub # v0.1.0 latest
+```
+
+And follow full [example](./example/main.go).
