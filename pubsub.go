@@ -265,7 +265,7 @@ func (p *PubSub) Unsubscribe(subscriber *Subscriber, topics ...string) (bool, ui
 		}
 
 		_topics := make([]string, 0, len(topics))
-		for i := 0; i < len(_topics); i++ {
+		for i := 0; i < len(topics); i++ {
 
 			if state, ok := subscriber.Topics[topics[i]]; ok {
 				if state {
