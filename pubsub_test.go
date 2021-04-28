@@ -51,7 +51,12 @@ func TestPubSub(t *testing.T) {
 		t.Errorf("Expected subscriber count to be 0, got %d", count)
 	}
 
-	subscriber := pubsub.Subscribe(16, TOPIC_1)
+	subscriber := pubsub.Subscribe(16)
+	if subscriber != nil {
+		t.Errorf("Expected no creation of subscriber")
+	}
+
+	subscriber = pubsub.Subscribe(16, TOPIC_1)
 	if subscriber.Id != 1 {
 		t.Errorf("Expected subscriber id to be 1, got %d", subscriber.Id)
 	}
@@ -92,6 +97,14 @@ func TestPubSub(t *testing.T) {
 	}
 	if count != 1 {
 		t.Errorf("Expected subscriber count to be 1, got %d", count)
+	}
+
+	state, count = subscriber.AddSubscription(pubsub)
+	if !state {
+		t.Errorf("Expected to be able to add new topic subscriptions")
+	}
+	if count != 0 {
+		t.Errorf("Expected to subscribe to 0 new topic, got %d", count)
 	}
 
 	state, count = subscriber.AddSubscription(pubsub, TOPICS_2...)
@@ -150,6 +163,14 @@ func TestPubSub(t *testing.T) {
 		}
 	}
 
+	state, count = subscriber.Unsubscribe(pubsub)
+	if !state {
+		t.Errorf("Expected to be able to unsubscribe")
+	}
+	if count != 0 {
+		t.Errorf("Expected to unsubscribe from 0 topic, got %d", count)
+	}
+
 	state, count = subscriber.Unsubscribe(pubsub, TOPIC_1)
 	if !state {
 		t.Errorf("Expected to be able to unsubscribe")
@@ -163,7 +184,7 @@ func TestPubSub(t *testing.T) {
 		t.Errorf("Expected to unsubscribe from `%s`", TOPIC_1)
 	}
 
-	state, count = subscriber.UnsubcribeAll(pubsub)
+	state, count = subscriber.UnsubscribeAll(pubsub)
 	if !state {
 		t.Errorf("Expected to be able to unsubscribe")
 	}
@@ -180,6 +201,31 @@ func TestPubSub(t *testing.T) {
 	<-time.After(DURATION)
 	if pubsub.Alive {
 		t.Errorf("Expected Pub/Sub system to be dead")
+	}
+
+	published, _ = pubsub.Publish(&msg)
+	if published {
+		t.Errorf("Expected pub/sub system to be down")
+	}
+
+	state, _ = subscriber.AddSubscription(pubsub)
+	if state {
+		t.Errorf("Expected pub/sub system to be down")
+	}
+
+	state, _ = subscriber.Unsubscribe(pubsub)
+	if state {
+		t.Errorf("Expected pub/sub system to be down")
+	}
+
+	state, _ = subscriber.UnsubscribeAll(pubsub)
+	if state {
+		t.Errorf("Expected pub/sub system to be down")
+	}
+
+	subscriber = pubsub.Subscribe(16)
+	if subscriber != nil {
+		t.Errorf("Expected pub/sub system to be down")
 	}
 
 }
