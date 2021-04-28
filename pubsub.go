@@ -137,6 +137,10 @@ func (p *PubSub) Start(ctx context.Context) {
 						unsubscribedFrom++
 					}
 
+					if len(subs) == 0 {
+						delete(p.Subscribers, req.Topics[i])
+					}
+
 				}
 
 			}

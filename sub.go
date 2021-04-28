@@ -46,3 +46,19 @@ func (s *Subscriber) Unsubscribe(pubsub *PubSub, topics ...string) (bool, uint64
 func (s *Subscriber) UnsubscribeAll(pubsub *PubSub) (bool, uint64) {
 	return pubsub.UnsubscribeAll(s)
 }
+
+// Close - Destroys subscriber
+func (s *Subscriber) Close() bool {
+
+	for {
+		if msg := s.Next(); msg == nil {
+			break
+		}
+	}
+
+	for topic := range s.Topics {
+		delete(s.Topics, topic)
+	}
+
+	return true
+}
