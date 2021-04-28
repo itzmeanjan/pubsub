@@ -32,6 +32,8 @@ func New() *PubSub {
 
 // Start - Handles request from publishers & subscribers, so that
 // message publishing can be abstracted
+//
+// Consider running it as a go routine
 func (p *PubSub) Start(ctx context.Context) {
 
 	for {
@@ -56,14 +58,27 @@ func (p *PubSub) Start(ctx context.Context) {
 
 				for _, sub := range subs {
 
-					msg := PublishedMessage{
-						Data:  req.Message.Data,
-						Topic: topic,
-					}
-
 					// Checking whether receiver channel has enough buffer space
 					// to hold this message or not
 					if len(sub) < cap(sub) {
+
+						// As byte slices are reference types i.e. if we
+						// just pass it over channel to subscribers & either
+						// of publishers/ subscribers make any modification
+						// to that slice, it'll be reflected for all parties involved
+						//
+						// So it's better to give everyone their exclusive copy
+						copied := make([]byte, len(req.Message.Data))
+						n := copy(copied, req.Message.Data)
+						if n != len(req.Message.Data) {
+							continue
+						}
+
+						msg := PublishedMessage{
+							Data:  copied,
+							Topic: topic,
+						}
+
 						sub <- &msg
 						publishedOn++
 					}
