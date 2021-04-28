@@ -150,6 +150,32 @@ func TestPubSub(t *testing.T) {
 		}
 	}
 
+	state, count = subscriber.Unsubscribe(pubsub, TOPIC_1)
+	if !state {
+		t.Errorf("Expected to be able to unsubscribe")
+	}
+	if count != 1 {
+		t.Errorf("Expected to unsubscribe from 1 topic, got %d", count)
+	}
+
+	state = subscriber.Topics[TOPIC_1]
+	if state {
+		t.Errorf("Expected to unsubscribe from `%s`", TOPIC_1)
+	}
+
+	state, count = subscriber.UnsubcribeAll(pubsub)
+	if !state {
+		t.Errorf("Expected to be able to unsubscribe")
+	}
+	if count != 1 {
+		t.Errorf("Expected to unsubscribe from 1 topic, got %d", count)
+	}
+
+	state = subscriber.Topics[TOPIC_2]
+	if state {
+		t.Errorf("Expected to unsubscribe from `%s`", TOPIC_2)
+	}
+
 	cancel()
 	<-time.After(DURATION)
 	if pubsub.Alive {
