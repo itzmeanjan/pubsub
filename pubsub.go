@@ -20,7 +20,7 @@ type PubSub struct {
 // can be routed to various topics
 func New() *PubSub {
 	return &PubSub{
-		Alive:            true,
+		Alive:            false,
 		Index:            1,
 		MessageChan:      make(chan *PublishRequest, 1),
 		SubscriberIdChan: make(chan chan uint64, 1),
@@ -35,6 +35,10 @@ func New() *PubSub {
 //
 // Consider running it as a go routine
 func (p *PubSub) Start(ctx context.Context) {
+
+	// Because pub/sub system is now running
+	// & it's ready to process requests
+	p.Alive = true
 
 	for {
 
