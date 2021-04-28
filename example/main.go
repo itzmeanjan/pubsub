@@ -71,4 +71,9 @@ func main() {
 		log.Printf("✅ Unsubscribed from %d topic(s)\n", from)
 	}
 
+	// Calling this multiple times doesn't cause harm, but not required
+	if subscriber.Close() {
+		log.Printf("✅ Destroyed subscriber\n")
+	}
+
 }
