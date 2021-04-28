@@ -13,3 +13,7 @@ Good thing is that Go channels are concurrent-safe. So I considered extending it
 --- | --: | --:
 Single | ✅ | ✅
 Multiple | ✅ | ✅
+
+## Design
+
+![architecture](./sc/architecture.jpg)
