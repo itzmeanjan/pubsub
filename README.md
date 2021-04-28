@@ -38,3 +38,5 @@ go get github.com/itzmeanjan/pubsub # v0.1.0 latest
 ```
 
 And follow full [example](./example/main.go).
+
+You can check package documentation [here](https://pkg.go.dev/github.com/itzmeanjan/pubsub)
