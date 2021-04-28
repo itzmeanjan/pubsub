@@ -178,6 +178,10 @@ func (p *PubSub) Subscribe(cap uint64, topics ...string) *Subscriber {
 
 	if p.Alive {
 
+		if len(topics) == 0 {
+			return nil
+		}
+
 		idGenChan := make(chan uint64)
 		p.SubscriberIdChan <- idGenChan
 
@@ -210,6 +214,10 @@ func (p *PubSub) Subscribe(cap uint64, topics ...string) *Subscriber {
 func (p *PubSub) AddSubscription(subscriber *Subscriber, topics ...string) (bool, uint64) {
 
 	if p.Alive {
+
+		if len(topics) == 0 {
+			return true, 0
+		}
 
 		_subscriber := &Subscriber{
 			Id:      subscriber.Id,
@@ -252,6 +260,10 @@ func (p *PubSub) Unsubscribe(subscriber *Subscriber, topics ...string) (bool, ui
 
 	if p.Alive {
 
+		if len(topics) == 0 {
+			return true, 0
+		}
+
 		_topics := make([]string, 0, len(topics))
 		for i := 0; i < len(_topics); i++ {
 
@@ -262,6 +274,10 @@ func (p *PubSub) Unsubscribe(subscriber *Subscriber, topics ...string) (bool, ui
 				}
 			}
 
+		}
+
+		if len(_topics) == 0 {
+			return true, 0
 		}
 
 		resChan := make(chan uint64)
@@ -294,6 +310,10 @@ func (p *PubSub) UnsubscribeAll(subscriber *Subscriber) (bool, uint64) {
 				subscriber.Topics[topic] = false
 			}
 
+		}
+
+		if len(topics) == 0 {
+			return true, 0
 		}
 
 		resChan := make(chan uint64)
