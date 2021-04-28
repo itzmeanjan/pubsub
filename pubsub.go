@@ -20,7 +20,7 @@ type PubSub struct {
 // can be routed to various topics
 func New() *PubSub {
 	return &PubSub{
-		Alive:            true,
+		Alive:            false,
 		Index:            1,
 		MessageChan:      make(chan *PublishRequest, 1),
 		SubscriberIdChan: make(chan chan uint64, 1),
@@ -32,7 +32,13 @@ func New() *PubSub {
 
 // Start - Handles request from publishers & subscribers, so that
 // message publishing can be abstracted
+//
+// Consider running it as a go routine
 func (p *PubSub) Start(ctx context.Context) {
+
+	// Because pub/sub system is now running
+	// & it's ready to process requests
+	p.Alive = true
 
 	for {
 
@@ -56,14 +62,27 @@ func (p *PubSub) Start(ctx context.Context) {
 
 				for _, sub := range subs {
 
-					msg := PublishedMessage{
-						Data:  req.Message.Data,
-						Topic: topic,
-					}
-
 					// Checking whether receiver channel has enough buffer space
 					// to hold this message or not
 					if len(sub) < cap(sub) {
+
+						// As byte slices are reference types i.e. if we
+						// just pass it over channel to subscribers & either
+						// of publishers/ subscribers make any modification
+						// to that slice, it'll be reflected for all parties involved
+						//
+						// So it's better to give everyone their exclusive copy
+						copied := make([]byte, len(req.Message.Data))
+						n := copy(copied, req.Message.Data)
+						if n != len(req.Message.Data) {
+							continue
+						}
+
+						msg := PublishedMessage{
+							Data:  copied,
+							Topic: topic,
+						}
+
 						sub <- &msg
 						publishedOn++
 					}
@@ -118,6 +137,10 @@ func (p *PubSub) Start(ctx context.Context) {
 						unsubscribedFrom++
 					}
 
+					if len(subs) == 0 {
+						delete(p.Subscribers, req.Topics[i])
+					}
+
 				}
 
 			}
@@ -159,6 +182,10 @@ func (p *PubSub) Subscribe(cap uint64, topics ...string) *Subscriber {
 
 	if p.Alive {
 
+		if len(topics) == 0 {
+			return nil
+		}
+
 		idGenChan := make(chan uint64)
 		p.SubscriberIdChan <- idGenChan
 
@@ -192,6 +219,10 @@ func (p *PubSub) AddSubscription(subscriber *Subscriber, topics ...string) (bool
 
 	if p.Alive {
 
+		if len(topics) == 0 {
+			return true, 0
+		}
+
 		_subscriber := &Subscriber{
 			Id:      subscriber.Id,
 			Channel: subscriber.Channel,
@@ -207,6 +238,7 @@ func (p *PubSub) AddSubscription(subscriber *Subscriber, topics ...string) (bool
 			}
 
 			_subscriber.Topics[topics[i]] = true
+			subscriber.Topics[topics[i]] = true
 
 		}
 
@@ -232,8 +264,12 @@ func (p *PubSub) Unsubscribe(subscriber *Subscriber, topics ...string) (bool, ui
 
 	if p.Alive {
 
+		if len(topics) == 0 {
+			return true, 0
+		}
+
 		_topics := make([]string, 0, len(topics))
-		for i := 0; i < len(_topics); i++ {
+		for i := 0; i < len(topics); i++ {
 
 			if state, ok := subscriber.Topics[topics[i]]; ok {
 				if state {
@@ -242,6 +278,10 @@ func (p *PubSub) Unsubscribe(subscriber *Subscriber, topics ...string) (bool, ui
 				}
 			}
 
+		}
+
+		if len(_topics) == 0 {
+			return true, 0
 		}
 
 		resChan := make(chan uint64)
@@ -274,6 +314,10 @@ func (p *PubSub) UnsubscribeAll(subscriber *Subscriber) (bool, uint64) {
 				subscriber.Topics[topic] = false
 			}
 
+		}
+
+		if len(topics) == 0 {
+			return true, 0
 		}
 
 		resChan := make(chan uint64)
