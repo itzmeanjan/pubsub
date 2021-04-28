@@ -258,6 +258,10 @@ func TestPubSub(t *testing.T) {
 		t.Errorf("Expected pub/sub system to be down")
 	}
 
+	if !subscriber.Close() {
+		t.Errorf("Expected to be able to close subscriber")
+	}
+
 	subscriber = pubsub.Subscribe(16)
 	if subscriber != nil {
 		t.Errorf("Expected pub/sub system to be down")
