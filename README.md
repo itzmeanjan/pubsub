@@ -17,3 +17,7 @@ Multiple | ✅ | ✅
 ## Design
 
 ![architecture](./sc/architecture.jpg)
+
+## Usage
+
+Here's an [example](./example/main.go)
