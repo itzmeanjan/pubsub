@@ -226,6 +226,7 @@ func (p *PubSub) AddSubscription(subscriber *Subscriber, topics ...string) (bool
 			}
 
 			_subscriber.Topics[topics[i]] = true
+			subscriber.Topics[topics[i]] = true
 
 		}
 
