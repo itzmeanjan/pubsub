@@ -11,9 +11,12 @@ import (
 func main() {
 	broker := pubsub.New()
 
+	// -- Very important, starting pub/sub system
 	ctx, cancel := context.WithCancel(context.Background())
-	go broker.Start(ctx)
+	go broker.Start(ctx) // this is blocking call
 	defer cancel()
+	// -- Starting pub/sub system
+
 	// Just waiting little while to give pub/sub broker enough time to get up & running
 	<-time.After(time.Duration(1) * time.Millisecond)
 
