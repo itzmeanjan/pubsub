@@ -18,6 +18,12 @@ Multiple | ✅ | ✅
 
 ![architecture](./sc/architecture.jpg)
 
+## Stress Testing
+
+Stress testing using `pubsub` was done for following message passing patterns, where every message was of size **1024 bytes** & I attempted to calculate time taken for producer(s) & consumer(s) to respectively publish `{ 1MB, 2MB, 4MB ... 1GB }` data & consume same.
+
+- [Single Producer Single Consumer](./stress/charts/spsc.html)
+
 ## Usage
 
 First create a Go project with **GOMOD** support.
