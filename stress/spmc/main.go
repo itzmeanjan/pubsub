@@ -20,7 +20,7 @@ func getRandomByteSlice(len int) []byte {
 	return buffer
 }
 
-func simulate(target uint64, cap uint64, subsC uint64) (bool, time.Duration) {
+func simulate(target uint64, subsC uint64) (bool, time.Duration) {
 
 	broker := pubsub.New()
 
@@ -34,7 +34,7 @@ func simulate(target uint64, cap uint64, subsC uint64) (bool, time.Duration) {
 
 	for i := 0; i < int(subsC); i++ {
 
-		subscriber := broker.Subscribe(cap, "topic_1")
+		subscriber := broker.Subscribe(target, "topic_1")
 		if subscriber == nil {
 			log.Printf("Failed to subscribe\n")
 			return false, 0
@@ -125,7 +125,7 @@ func main() {
 
 		for j := 2; j <= 8; j *= 2 {
 
-			ok, timeTaken := simulate(target, 2048, uint64(j))
+			ok, timeTaken := simulate(target, uint64(j))
 			if !ok {
 				log.Printf("❌ %s\n", datasize.KB*datasize.ByteSize(target))
 				continue
