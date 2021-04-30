@@ -1,9 +1,13 @@
 package main
 
+//go:generate go run main.go
+
 import (
 	"context"
+	"fmt"
 	"log"
 	"math/rand"
+	"os"
 	"time"
 
 	"github.com/c2h5oh/datasize"
@@ -87,6 +91,14 @@ func simulate(target uint64) (bool, time.Duration) {
 
 func main() {
 
+	f, _ := os.OpenFile("../spsc.csv", os.O_TRUNC|os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	defer func() {
+
+		f.Close()
+		log.Printf("Exported statistics in `../spsc.csv`\n")
+
+	}()
+
 	for i := 1; i <= 1024; i *= 2 {
 
 		target := uint64(i * 1024)
@@ -98,6 +110,8 @@ func main() {
 		}
 
 		log.Printf("✅ %s in %s\n", datasize.KB*datasize.ByteSize(target), timeTaken)
+
+		f.WriteString(fmt.Sprintf("%s, %d\n", datasize.KB*datasize.ByteSize(target), timeTaken))
 
 	}
 
