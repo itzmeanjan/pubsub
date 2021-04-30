@@ -18,7 +18,7 @@ func main() {
 	// -- Starting pub/sub system
 
 	// Just waiting little while to give pub/sub broker enough time to get up & running
-	<-time.After(time.Duration(1) * time.Millisecond)
+	<-time.After(time.Duration(10) * time.Nanosecond)
 
 	// At max 16 messages to be kept bufferred at a time
 	subscriber := broker.Subscribe(16, "topic_1", "topic_2")
