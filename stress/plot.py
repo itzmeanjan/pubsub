@@ -5,6 +5,18 @@ import seaborn as sns
 from itertools import chain
 
 
+def humanize(delta: float) -> float:
+    if delta < 10 ** 3:
+        return f'{delta}μs'
+
+    (ms, us) = divmod(delta, 10 ** 3)
+    if ms < 10 ** 3:
+        return f'{ms+us/10**3:.1f}ms'
+
+    (s, ms) = divmod(ms, 10 ** 3)
+    return f'{s+ms/10**3:.1f}s'
+
+
 def spsc(file: str):
 
     with open(file, 'r') as f:
@@ -23,7 +35,7 @@ def spsc(file: str):
             for j, k in enumerate(fig.gca().patches):
                 fig.gca().text(k.get_x() + k.get_width() / 2,
                                k.get_y() + k.get_height() * 1.01,
-                               f'{int(y[j]/10**3)} ms',
+                               humanize(y[j]),
                                ha='center',
                                fontsize=11,
                                color='black')
@@ -54,7 +66,7 @@ def spmc(file):
             zip(*[y[i:i+3] for i in range(0, len(y), 3)])))
 
         with plt.style.context('seaborn-bright'):
-            fig = plt.Figure(figsize=(16, 9), dpi=100)
+            fig = plt.Figure(figsize=(50, 18), dpi=100)
 
             sns.barplot(x=x, y=y, hue=hue, orient='v',
                         ax=fig.gca(), palette="Blues_d")
@@ -62,14 +74,16 @@ def spmc(file):
             for j, k in enumerate(fig.gca().patches):
                 fig.gca().text(k.get_x() + k.get_width() / 2,
                                k.get_y() + k.get_height() * 1.01,
-                               int(label[j]/10**3),
+                               humanize(label[j]),
                                ha='center',
-                               fontsize=11,
+                               fontsize=18,
                                color='k')
 
-            fig.gca().set_xlabel('Data consumed by each Consumer', labelpad=12)
-            fig.gca().set_ylabel('Time in Milliseconds', labelpad=12)
-            fig.gca().set_title('Single Producer Multiple Consumers', pad=16, fontsize=20)
+            fig.gca().set_xlabel('Data consumed by each Consumer', labelpad=12, fontsize=22)
+            fig.gca().set_ylabel('Time in Milliseconds', labelpad=12, fontsize=22)
+            fig.gca().set_title('Single Producer Multiple Consumers', pad=16, fontsize=30)
+            fig.gca().legend(fontsize = 'x-large')
+            fig.gca().tick_params(axis='both', which='major', labelsize=20)
 
             fig.savefig('spmc.png', bbox_inches='tight', pad_inches=.5)
             plt.close(fig)
