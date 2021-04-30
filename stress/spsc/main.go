@@ -150,6 +150,6 @@ func main() {
 
 	}
 
-	drawChart(xAxis, producer, consumer, "bar.html")
+	drawChart(xAxis, producer, consumer, "../charts/bar.html")
 
 }
