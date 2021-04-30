@@ -150,6 +150,7 @@ func main() {
 
 	}
 
-	drawChart(xAxis, producer, consumer, "../charts/bar.html")
+	drawChart(xAxis, producer, consumer, "../charts/spsc.html")
+	log.Printf("Plotted bar chart for SPSC\n")
 
 }
