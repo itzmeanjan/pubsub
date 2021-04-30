@@ -4,9 +4,12 @@ import (
 	"context"
 	"log"
 	"math/rand"
+	"os"
 	"time"
 
 	"github.com/c2h5oh/datasize"
+	"github.com/go-echarts/go-echarts/v2/charts"
+	"github.com/go-echarts/go-echarts/v2/opts"
 	"github.com/itzmeanjan/pubsub"
 )
 
@@ -88,7 +91,42 @@ func simulate(target uint64, cap uint64) (bool, time.Duration, time.Duration) {
 
 }
 
+func drawChart(xAxis []string, producer []opts.BarData, consumer []opts.BarData, sink string) {
+
+	bar := charts.NewBar()
+
+	bar.SetGlobalOptions(
+		charts.WithTitleOpts(opts.Title{
+			Title: "Single Producer Single Consumer",
+		}),
+		charts.WithLegendOpts(opts.Legend{Right: "80%"}),
+		charts.WithXAxisOpts(opts.XAxis{
+			Name: "Data",
+		}),
+		charts.WithYAxisOpts(opts.YAxis{
+			Name:      "Time",
+			AxisLabel: &opts.AxisLabel{Show: true, Formatter: "{value} ms"},
+		}))
+
+	bar.SetXAxis(xAxis).
+		AddSeries("Producer", producer).
+		AddSeries("Consumer", consumer).
+		SetSeriesOptions(charts.WithLabelOpts(opts.Label{
+			Show:      true,
+			Position:  "top",
+			Formatter: "{c}",
+		}))
+
+	f, _ := os.Create(sink)
+	bar.Render(f)
+
+}
+
 func main() {
+
+	var xAxis = make([]string, 0)
+	var producer = make([]opts.BarData, 0)
+	var consumer = make([]opts.BarData, 0)
 
 	for i := 1; i <= 1024; i *= 2 {
 
@@ -102,6 +140,16 @@ func main() {
 
 		log.Printf("✅ %s :: Producer : %s, Consumer : %s\n", datasize.KB*datasize.ByteSize(target), publisherTime, consumerTime)
 
+		xAxis = append(xAxis, (datasize.KB * datasize.ByteSize(target)).String())
+		producer = append(producer, opts.BarData{
+			Value: publisherTime / (time.Duration(1) * time.Millisecond),
+		})
+		consumer = append(consumer, opts.BarData{
+			Value: consumerTime / (time.Duration(1) * time.Millisecond),
+		})
+
 	}
+
+	drawChart(xAxis, producer, consumer, "bar.html")
 
 }
