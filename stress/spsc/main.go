@@ -23,7 +23,7 @@ func getRandomByteSlice(len int) []byte {
 	return buffer
 }
 
-func simulate(target uint64, cap uint64) (bool, time.Duration, time.Duration) {
+func simulate(target uint64, cap uint64) (bool, time.Duration) {
 
 	broker := pubsub.New()
 
@@ -36,15 +36,13 @@ func simulate(target uint64, cap uint64) (bool, time.Duration, time.Duration) {
 	subscriber := broker.Subscribe(cap, "topic_1")
 	if subscriber == nil {
 		log.Printf("Failed to subscribe\n")
-		return false, 0, 0
+		return false, 0
 	}
 
-	var publisherTime, consumerTime time.Duration
 	signal := make(chan struct{})
 
 	go func() {
 
-		startedAt := time.Now()
 		msg := pubsub.Message{
 			Topics: []string{"topic_1"},
 			Data:   getRandomByteSlice(1024),
@@ -62,7 +60,6 @@ func simulate(target uint64, cap uint64) (bool, time.Duration, time.Duration) {
 
 		}
 
-		publisherTime = time.Since(startedAt)
 		close(signal)
 
 	}()
@@ -71,6 +68,7 @@ func simulate(target uint64, cap uint64) (bool, time.Duration, time.Duration) {
 
 	var startedAt = time.Now()
 	var done uint64
+
 	for {
 
 		msg := subscriber.Next()
@@ -84,14 +82,12 @@ func simulate(target uint64, cap uint64) (bool, time.Duration, time.Duration) {
 		}
 	}
 
-	consumerTime = time.Since(startedAt)
 	<-signal
-
-	return true, publisherTime, consumerTime
+	return true, time.Since(startedAt)
 
 }
 
-func drawChart(xAxis []string, producer []opts.BarData, consumer []opts.BarData, sink string) {
+func drawChart(xAxis []string, durations []opts.BarData, sink string) {
 
 	bar := charts.NewBar()
 
@@ -109,8 +105,7 @@ func drawChart(xAxis []string, producer []opts.BarData, consumer []opts.BarData,
 		}))
 
 	bar.SetXAxis(xAxis).
-		AddSeries("Producer", producer).
-		AddSeries("Consumer", consumer).
+		AddSeries("Duration", durations).
 		SetSeriesOptions(charts.WithLabelOpts(opts.Label{
 			Show:      true,
 			Position:  "top",
@@ -125,32 +120,28 @@ func drawChart(xAxis []string, producer []opts.BarData, consumer []opts.BarData,
 func main() {
 
 	var xAxis = make([]string, 0)
-	var producer = make([]opts.BarData, 0)
-	var consumer = make([]opts.BarData, 0)
+	var durations = make([]opts.BarData, 0)
 
 	for i := 1; i <= 1024; i *= 2 {
 
 		target := uint64(i * 1024)
 
-		ok, publisherTime, consumerTime := simulate(target, 1024)
+		ok, timeTaken := simulate(target, 1024)
 		if !ok {
 			log.Printf("❌ %s\n", datasize.KB*datasize.ByteSize(target))
 			continue
 		}
 
-		log.Printf("✅ %s :: Producer : %s, Consumer : %s\n", datasize.KB*datasize.ByteSize(target), publisherTime, consumerTime)
+		log.Printf("✅ %s in %s\n", datasize.KB*datasize.ByteSize(target), timeTaken)
 
 		xAxis = append(xAxis, (datasize.KB * datasize.ByteSize(target)).String())
-		producer = append(producer, opts.BarData{
-			Value: publisherTime / (time.Duration(1) * time.Millisecond),
-		})
-		consumer = append(consumer, opts.BarData{
-			Value: consumerTime / (time.Duration(1) * time.Millisecond),
+		durations = append(durations, opts.BarData{
+			Value: timeTaken / (time.Duration(1) * time.Millisecond),
 		})
 
 	}
 
-	drawChart(xAxis, producer, consumer, "../charts/spsc.html")
+	drawChart(xAxis, durations, "../charts/spsc.html")
 	log.Printf("Plotted bar chart for SPSC\n")
 
 }
