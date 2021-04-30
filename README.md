@@ -24,6 +24,8 @@ Stress testing using `pubsub` was done for following message passing patterns, w
 
 ![spsc](./stress/spsc.png)
 
+![spmc](./stress/spmc.png)
+
 ## Usage
 
 First create a Go project with **GOMOD** support.
