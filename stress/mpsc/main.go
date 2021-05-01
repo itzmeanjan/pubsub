@@ -92,7 +92,7 @@ func main() {
 
 	table := tablewriter.NewWriter(os.Stdout)
 	table.SetHeader([]string{"Data", "Producer(s)", "Total Produced", "Consumed Data", "Time"})
-	table.SetCaption(true, "Multiple Producers Single Consumer - stress testing")
+	table.SetCaption(true, "Multiple Producers Single Consumer")
 
 	for i := 1; i <= 1024; i *= 2 {
 		target := uint64(i * 1024)

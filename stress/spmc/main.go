@@ -12,6 +12,7 @@ import (
 
 	"github.com/c2h5oh/datasize"
 	"github.com/itzmeanjan/pubsub"
+	"github.com/olekukonko/tablewriter"
 )
 
 func getRandomByteSlice(len int) []byte {
@@ -123,32 +124,33 @@ func simulate(target uint64, subsC uint64) (bool, time.Duration) {
 
 func main() {
 
-	f, _ := os.OpenFile("../spmc.csv", os.O_TRUNC|os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	defer func() {
-
-		f.Close()
-		log.Printf("Exported statistics in `../spmc.csv`\n")
-
-	}()
+	table := tablewriter.NewWriter(os.Stdout)
+	table.SetHeader([]string{"Data", "Total Data", "Consumer(s)", "Consumed Data", "Time"})
+	table.SetCaption(true, "Single Producer Multiple Consumers")
 
 	for i := 1; i <= 1024; i *= 2 {
 
 		target := uint64(i * 1024)
 
-		for j := 2; j <= 8; j *= 2 {
-
+		var j uint64 = 2
+		for ; j <= 8; j *= 2 {
 			ok, timeTaken := simulate(target, uint64(j))
 			if !ok {
-				log.Printf("❌ %s\n", datasize.KB*datasize.ByteSize(target))
 				continue
 			}
 
-			log.Printf("✅ %s with %d subscriber(s) in %s\n", datasize.KB*datasize.ByteSize(target), j, timeTaken)
-
-			f.WriteString(fmt.Sprintf("%s, %d, %d\n", datasize.KB*datasize.ByteSize(target), j, timeTaken))
-
+			_buffer := []string{
+				(datasize.KB * datasize.ByteSize(target)).String(),
+				(datasize.KB * datasize.ByteSize(target*j)).String(),
+				fmt.Sprintf("%d", j),
+				(datasize.KB * datasize.ByteSize(0)).String(),
+				timeTaken.String(),
+			}
+			table.Append(_buffer)
 		}
 
 	}
+
+	table.Render()
 
 }
