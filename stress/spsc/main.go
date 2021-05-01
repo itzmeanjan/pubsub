@@ -4,7 +4,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"math/rand"
 	"os"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/c2h5oh/datasize"
 	"github.com/itzmeanjan/pubsub"
+	"github.com/olekukonko/tablewriter"
 )
 
 func getRandomByteSlice(len int) []byte {
@@ -91,13 +91,9 @@ func simulate(target uint64) (bool, time.Duration) {
 
 func main() {
 
-	f, _ := os.OpenFile("../spsc.csv", os.O_TRUNC|os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	defer func() {
-
-		f.Close()
-		log.Printf("Exported statistics in `../spsc.csv`\n")
-
-	}()
+	table := tablewriter.NewWriter(os.Stdout)
+	table.SetHeader([]string{"Produced Data", "Time"})
+	table.SetCaption(true, "Single Producer Single Consumer")
 
 	for i := 1; i <= 1024; i *= 2 {
 
@@ -105,14 +101,17 @@ func main() {
 
 		ok, timeTaken := simulate(target)
 		if !ok {
-			log.Printf("❌ %s\n", datasize.KB*datasize.ByteSize(target))
 			continue
 		}
 
-		log.Printf("✅ %s in %s\n", datasize.KB*datasize.ByteSize(target), timeTaken)
-
-		f.WriteString(fmt.Sprintf("%s, %d\n", datasize.KB*datasize.ByteSize(target), timeTaken))
+		_buffer := []string{
+			(datasize.KB * datasize.ByteSize(target)).String(),
+			timeTaken.String(),
+		}
+		table.Append(_buffer)
 
 	}
+
+	table.Render()
 
 }
