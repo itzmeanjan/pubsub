@@ -25,7 +25,7 @@ func getRandomByteSlice(len int) []byte {
 	return buffer
 }
 
-func simulate(target uint64, subsC uint64) (bool, time.Duration) {
+func simulate(target uint64, subsC uint64) (bool, uint64, time.Duration) {
 
 	broker := pubsub.New()
 
@@ -38,67 +38,69 @@ func simulate(target uint64, subsC uint64) (bool, time.Duration) {
 	subscribers := make([]*pubsub.Subscriber, 0, subsC)
 
 	for i := 0; i < int(subsC); i++ {
-
-		subscriber := broker.Subscribe(target, "topic_1")
+		subscriber := broker.Subscribe(target, "topic_1", "producer_dead")
 		if subscriber == nil {
 			log.Printf("Failed to subscribe\n")
-			return false, 0
+			return false, 0, 0
 		}
 
 		subscribers = append(subscribers, subscriber)
-
 	}
 
-	producerSig := make(chan struct{})
-
 	go func() {
-
 		msg := pubsub.Message{
 			Topics: []string{"topic_1"},
 			Data:   getRandomByteSlice(1024),
 		}
 
-		var done, i uint64
+		var i uint64
 		for ; i < target; i++ {
-
-			ok, c := broker.Publish(&msg)
+			ok, _ := broker.Publish(&msg)
 			if !ok {
 				break
 			}
-
-			done += c
-
 		}
 
-		close(producerSig)
-
+		broker.Publish(&pubsub.Message{Topics: []string{"producer_dead"}})
 	}()
 
-	consumerSig := make(chan time.Duration, subsC)
+	consumerSig := make(chan struct {
+		duration time.Duration
+		consumed uint64
+	}, subsC)
 
 	for i := 0; i < len(subscribers); i++ {
 
 		go func(subscriber *pubsub.Subscriber) {
 
 			var startedAt = time.Now()
-			var done uint64
+			var consumed uint64
+			var producerSignaled bool
 
 			for {
-
 				msg := subscriber.Next()
 				if msg == nil {
+					if producerSignaled {
+						break
+					}
 					continue
 				}
 
-				done++
-				if done == target {
-					break
+				if msg.Topic == "producer_dead" {
+					producerSignaled = true
+					continue
 				}
 
+				consumed += uint64(len(msg.Data))
 			}
 
-			<-producerSig
-			consumerSig <- time.Since(startedAt)
+			consumerSig <- struct {
+				duration time.Duration
+				consumed uint64
+			}{
+				duration: time.Since(startedAt),
+				consumed: consumed,
+			}
 
 		}(subscribers[i])
 
@@ -106,10 +108,12 @@ func simulate(target uint64, subsC uint64) (bool, time.Duration) {
 
 	var received int
 	var totalTimeSpent time.Duration
+	var totalConsumed uint64
 
-	for timeSpent := range consumerSig {
+	for data := range consumerSig {
 
-		totalTimeSpent += timeSpent
+		totalTimeSpent += data.duration
+		totalConsumed += data.consumed
 
 		received++
 		if received >= len(subscribers) {
@@ -118,14 +122,14 @@ func simulate(target uint64, subsC uint64) (bool, time.Duration) {
 
 	}
 
-	return true, totalTimeSpent / time.Duration(received)
+	return true, totalConsumed, totalTimeSpent / time.Duration(received)
 
 }
 
 func main() {
 
 	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"Data", "Total Data", "Consumer(s)", "Consumed Data", "Time"})
+	table.SetHeader([]string{"Published Data", "Total Published Data", "Consumer(s)", "Total Consumed Data", "Time"})
 	table.SetCaption(true, "Single Producer Multiple Consumers")
 
 	for i := 1; i <= 1024; i *= 2 {
@@ -134,7 +138,7 @@ func main() {
 
 		var j uint64 = 2
 		for ; j <= 8; j *= 2 {
-			ok, timeTaken := simulate(target, uint64(j))
+			ok, consumed, timeTaken := simulate(target, uint64(j))
 			if !ok {
 				continue
 			}
@@ -143,7 +147,7 @@ func main() {
 				(datasize.KB * datasize.ByteSize(target)).String(),
 				(datasize.KB * datasize.ByteSize(target*j)).String(),
 				fmt.Sprintf("%d", j),
-				(datasize.KB * datasize.ByteSize(0)).String(),
+				(datasize.B * datasize.ByteSize(consumed)).String(),
 				timeTaken.String(),
 			}
 			table.Append(_buffer)
