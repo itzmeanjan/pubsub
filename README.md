@@ -22,7 +22,7 @@ Multiple | ✅ | ✅
 
 Stress testing using `pubsub` was done for following message passing patterns, where every message was of size **1024 bytes** & I attempted to calculate time taken for producer(s) & consumer(s) to respectively publish `{ 1MB, 2MB, 4MB ... 1GB }` data & consume same.
 
-![spsc](./stress/spsc.png)
+![spsc](./sc/spsc.png)
 
 ![spmc](./stress/spmc.png)
 
