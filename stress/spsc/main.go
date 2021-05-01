@@ -24,7 +24,7 @@ func getRandomByteSlice(len int) []byte {
 	return buffer
 }
 
-func simulate(target uint64) (bool, time.Duration) {
+func simulate(target uint64) (bool, uint64, time.Duration) {
 
 	broker := pubsub.New()
 
@@ -37,7 +37,7 @@ func simulate(target uint64) (bool, time.Duration) {
 	subscriber := broker.Subscribe(target, "topic_1")
 	if subscriber == nil {
 		log.Printf("Failed to subscribe\n")
-		return false, 0
+		return false, 0, 0
 	}
 
 	signal := make(chan struct{})
@@ -49,63 +49,62 @@ func simulate(target uint64) (bool, time.Duration) {
 			Data:   getRandomByteSlice(1024),
 		}
 
-		var done, i uint64
+		var i uint64
 		for ; i < target; i++ {
-
-			ok, c := broker.Publish(&msg)
+			ok, _ := broker.Publish(&msg)
 			if !ok {
 				break
 			}
-
-			done += c
-
 		}
 
-		close(signal)
+		signal <- struct{}{}
 
 	}()
 
-	<-time.After(time.Duration(1) * time.Microsecond)
-
 	var startedAt = time.Now()
-	var done uint64
+	var consumed uint64
+	var signaled bool
 
 	for {
 
-		msg := subscriber.Next()
-		if msg == nil {
-			continue
-		}
+		select {
+		case <-signal:
+			signaled = true
 
-		done++
-		if done == target {
-			break
+		default:
+			msg := subscriber.Next()
+			if msg == nil {
+				if signaled {
+					return true, consumed, time.Since(startedAt)
+				}
+				break
+			}
+
+			consumed += uint64(len(msg.Data))
 		}
 
 	}
-
-	<-signal
-	return true, time.Since(startedAt)
 
 }
 
 func main() {
 
 	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"Produced Data", "Time"})
+	table.SetHeader([]string{"Produced Data", "Consumed Data", "Time"})
 	table.SetCaption(true, "Single Producer Single Consumer")
 
 	for i := 1; i <= 1024; i *= 2 {
 
 		target := uint64(i * 1024)
 
-		ok, timeTaken := simulate(target)
+		ok, consumed, timeTaken := simulate(target)
 		if !ok {
 			continue
 		}
 
 		_buffer := []string{
 			(datasize.KB * datasize.ByteSize(target)).String(),
+			(datasize.B * datasize.ByteSize(consumed)).String(),
 			timeTaken.String(),
 		}
 		table.Append(_buffer)
