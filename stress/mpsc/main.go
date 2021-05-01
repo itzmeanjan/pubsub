@@ -2,12 +2,15 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"math/rand"
+	"os"
 	"time"
 
 	"github.com/c2h5oh/datasize"
 	"github.com/itzmeanjan/pubsub"
+	"github.com/olekukonko/tablewriter"
 )
 
 func getRandomByteSlice(len int) []byte {
@@ -87,19 +90,31 @@ func simulate(target uint64, prodsC uint64) (bool, uint64, time.Duration) {
 
 func main() {
 
+	table := tablewriter.NewWriter(os.Stdout)
+	table.SetHeader([]string{"Data", "Producer(s)", "Total Produced", "Consumed Data", "Time"})
+	table.SetCaption(true, "Multiple Producers Single Consumer - stress testing")
+
 	for i := 1; i <= 1024; i *= 2 {
 		target := uint64(i * 1024)
 
-		var j uint64 = 1
-		for ; j <= 16; j *= 2 {
+		var j uint64 = 2
+		for ; j <= 8; j *= 2 {
 			ok, consumed, timeTaken := simulate(target/j, j)
 			if !ok {
-				log.Printf("❌ %s | %d prod\n", datasize.KB*datasize.ByteSize(target), j)
 				continue
 			}
 
-			log.Printf("%s ➡️ || ➡️ %s | %d prod | %s\n", datasize.KB*datasize.ByteSize(target), datasize.B*datasize.ByteSize(consumed), j, timeTaken)
+			_buffer := []string{
+				(datasize.KB * datasize.ByteSize(target/j)).String(),
+				fmt.Sprintf("%d", j),
+				(datasize.KB * datasize.ByteSize(target)).String(),
+				(datasize.B * datasize.ByteSize(consumed)).String(),
+				timeTaken.String(),
+			}
+			table.Append(_buffer)
 		}
 	}
+
+	table.Render()
 
 }
