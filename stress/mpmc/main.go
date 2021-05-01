@@ -1,7 +1,5 @@
 package main
 
-//go:generate go run main.go
-
 import (
 	"context"
 	"fmt"
@@ -25,7 +23,7 @@ func getRandomByteSlice(len int) []byte {
 	return buffer
 }
 
-func simulate(target uint64, subsC uint64) (bool, uint64, time.Duration) {
+func simulate(target uint64, parties uint64) (bool, uint64, time.Duration) {
 
 	broker := pubsub.New()
 
@@ -35,39 +33,44 @@ func simulate(target uint64, subsC uint64) (bool, uint64, time.Duration) {
 
 	<-time.After(time.Duration(100) * time.Microsecond)
 
-	subscribers := make([]*pubsub.Subscriber, 0, subsC)
+	subscribers := make([]*pubsub.Subscriber, 0, parties)
+	for i := 0; i < int(parties); i++ {
 
-	for i := 0; i < int(subsC); i++ {
-		subscriber := broker.Subscribe(target, "topic_1", "producer_dead")
+		subscriber := broker.Subscribe(target*parties, "topic_1", "producer_dead")
 		if subscriber == nil {
 			log.Printf("Failed to subscribe\n")
 			return false, 0, 0
 		}
-
 		subscribers = append(subscribers, subscriber)
+
 	}
 
-	go func() {
-		msg := pubsub.Message{
-			Topics: []string{"topic_1"},
-			Data:   getRandomByteSlice(1024),
-		}
+	for i := 0; i < int(parties); i++ {
 
-		var i uint64
-		for ; i < target; i++ {
-			ok, _ := broker.Publish(&msg)
-			if !ok {
-				break
+		go func(i int) {
+			msg := pubsub.Message{
+				Topics: []string{"topic_1"},
+				Data:   getRandomByteSlice(1024),
 			}
-		}
 
-		broker.Publish(&pubsub.Message{Topics: []string{"producer_dead"}})
-	}()
+			var j, total uint64
+			for ; j < target; j++ {
+				if ok, _ := broker.Publish(&msg); !ok {
+					break
+				}
+
+				total += uint64(len(msg.Data))
+			}
+
+			broker.Publish(&pubsub.Message{Topics: []string{"producer_dead"}})
+		}(i)
+
+	}
 
 	consumerSig := make(chan struct {
 		duration time.Duration
 		consumed uint64
-	}, subsC)
+	}, parties)
 
 	for i := 0; i < len(subscribers); i++ {
 
@@ -75,19 +78,19 @@ func simulate(target uint64, subsC uint64) (bool, uint64, time.Duration) {
 
 			var startedAt = time.Now()
 			var consumed uint64
-			var producerSignaled bool
+			var signaledBy uint64
 
 			for {
 				msg := subscriber.Next()
 				if msg == nil {
-					if producerSignaled {
+					if signaledBy == parties {
 						break
 					}
 					continue
 				}
 
 				if msg.Topic == "producer_dead" {
-					producerSignaled = true
+					signaledBy++
 					continue
 				}
 
@@ -129,22 +132,22 @@ func simulate(target uint64, subsC uint64) (bool, uint64, time.Duration) {
 func main() {
 
 	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"Published Data", "Total Published Data", "Consumer(s)", "Total Consumed Data", "Time"})
-	table.SetCaption(true, "Single Producer Multiple Consumers")
+	table.SetHeader([]string{"Data", "Producer(s)", "Total Produced", "Consumer(s)", "Total Consumed", "Time"})
+	table.SetCaption(true, "Multiple Producers Multiple Consumers")
 
 	for i := 1; i <= 1024; i *= 2 {
-
 		target := uint64(i * 1024)
 
 		var j uint64 = 2
-		for ; j <= 8; j *= 2 {
-			ok, consumed, timeTaken := simulate(target, j)
+		for ; j <= 4; j *= 2 {
+			ok, consumed, timeTaken := simulate(target/j, j)
 			if !ok {
 				continue
 			}
 
 			_buffer := []string{
-				(datasize.KB * datasize.ByteSize(target)).String(),
+				(datasize.KB * datasize.ByteSize(target/j)).String(),
+				fmt.Sprintf("%d", j),
 				(datasize.KB * datasize.ByteSize(target*j)).String(),
 				fmt.Sprintf("%d", j),
 				(datasize.B * datasize.ByteSize(consumed)).String(),
@@ -152,7 +155,6 @@ func main() {
 			}
 			table.Append(_buffer)
 		}
-
 	}
 
 	table.Render()
