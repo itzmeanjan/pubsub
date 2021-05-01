@@ -24,7 +24,7 @@ Stress testing using `pubsub` was done for following message passing patterns, w
 
 ![spsc](./sc/spsc.png)
 
-![spmc](./stress/spmc.png)
+![spmc](./sc/spmc.png)
 
 ![mpsc](./sc/mpsc.png)
 
