@@ -18,6 +18,28 @@ Multiple | ✅ | ✅
 
 ![architecture](./sc/architecture.jpg)
 
+## Stress Testing
+
+Stress testing using `pubsub` was done for following message passing patterns, where every message was of size **1024 bytes** & I attempted to calculate time spent for producing & consuming data under various configuration.
+
+> If you may be interested in taking a look at stress testing [examples](./stress)
+
+![spsc](./sc/spsc.png)
+
+![spmc](./sc/spmc.png)
+
+![mpsc](./sc/mpsc.png)
+
+![mpmc](./sc/mpmc.png)
+
+---
+
+One generic simulation with **N** -parties & rolling average of data transferred is present [here](./stress/generic/main.go)
+
+![generic_simulation](./sc/generic.png)
+
+---
+
 ## Usage
 
 First create a Go project with **GOMOD** support.
