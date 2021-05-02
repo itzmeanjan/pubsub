@@ -143,7 +143,7 @@ func TestPubSub(t *testing.T) {
 
 	}
 
-	published, count = pubsub.Publish(&msg)
+	published, count = pubsub.BPublish(&msg, time.Duration(1)*time.Millisecond)
 	if !published {
 		t.Errorf("Expected to be able to publish to topic")
 	}
