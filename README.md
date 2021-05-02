@@ -32,6 +32,14 @@ Stress testing using `pubsub` was done for following message passing patterns, w
 
 ![mpmc](./sc/mpmc.png)
 
+---
+
+One generic simulation with **N** -parties & rolling average of data transferred is present [here](./stress/generic/main.go)
+
+![generic_simulation](./sc/generic.png)
+
+---
+
 ## Usage
 
 First create a Go project with **GOMOD** support.
