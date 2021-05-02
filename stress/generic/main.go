@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/c2h5oh/datasize"
@@ -32,17 +35,13 @@ func generateTopics(count int) []string {
 	return topics
 }
 
-func simulate(rollAfter time.Duration, parties uint64) {
+func simulate(ctx context.Context, rollAfter time.Duration, parties uint64) {
 
 	broker := pubsub.New()
-
-	ctx, cancel := context.WithCancel(context.Background())
 	go broker.Start(ctx)
-	defer cancel()
+	topics := generateTopics(int(parties))
 
 	<-time.After(time.Duration(100) * time.Microsecond)
-
-	topics := generateTopics(int(parties))
 
 	subscribers := make([]*pubsub.Subscriber, 0, parties)
 	for i := 0; i < int(parties); i++ {
@@ -108,8 +107,6 @@ func simulate(rollAfter time.Duration, parties uint64) {
 		}(i, subscribers[i])
 	}
 
-	<-ctx.Done()
-
 }
 
 func main() {
@@ -118,6 +115,18 @@ func main() {
 	var parties = flag.Uint64("parties", 2, "#-of producers, consumers & topics involved in simulation")
 	flag.Parse()
 
-	simulate(*rollAfter, *parties)
+	ctx, cancel := context.WithCancel(context.Background())
+
+	interruptChan := make(chan os.Signal, 1)
+	signal.Notify(interruptChan, syscall.SIGTERM, syscall.SIGINT)
+
+	log.Printf("Pub/Sub Simulation with %d Producers, Consumers & Topics\n", *parties)
+	simulate(ctx, *rollAfter, *parties)
+
+	<-interruptChan
+	cancel()
+
+	<-time.After(time.Duration(1) * time.Second)
+	log.Printf("Graceful shutdown\n")
 
 }
