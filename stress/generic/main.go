@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log"
 	"math/rand"
@@ -112,5 +113,11 @@ func simulate(rollAfter time.Duration, parties uint64) {
 }
 
 func main() {
-	simulate(time.Duration(3)*time.Second, 2)
+
+	var rollAfter = flag.Duration("rollAfter", time.Duration(4)*time.Second, "calculate performance & roll to zero, after duration")
+	var parties = flag.Uint64("parties", 2, "#-of producers, consumers & topics involved in simulation")
+	flag.Parse()
+
+	simulate(*rollAfter, *parties)
+
 }
