@@ -1,5 +1,7 @@
 package pubsub
 
+import "time"
+
 // Message - Publisher showing intent of publishing arbitrary byte slice to topics
 type Message struct {
 	Topics []string
@@ -10,6 +12,7 @@ type Message struct {
 // while receiving how many subscribers it published to
 type PublishRequest struct {
 	Message      *Message
+	BlockFor     time.Duration
 	ResponseChan chan uint64
 }
 
