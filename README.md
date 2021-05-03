@@ -78,7 +78,9 @@ last_id = 1 // initial value
 next_id = last_id + 1
 last_id = next_id
 ```
-- If you're a publisher, you should concern yourself with only `PubSub.Publish(...)` method.
+- If you're a publisher, you should concern yourself with either of
+    - `PubSub.Publish(...)` [ **non-blocking** ]
+    - or `PubSub.BPublish(...)` [ **blocking** ]
 - If you're a subscriber, you should first subscribe to `N`-many topics, using `PubSub.Subscribe(...)`. You can start reading using
     - `Subscriber.Next()` [ **non-blocking** ]
     - `Subscriber.BNext(...)` [ **blocking** ]

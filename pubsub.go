@@ -1,6 +1,9 @@
 package pubsub
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 // PubSub - Pub/Sub Server i.e. holds which clients are subscribed to what topics,
 // manages publishing messages to correct topics, handles (un-)subscription requests
@@ -61,6 +64,13 @@ func (p *PubSub) Start(ctx context.Context) {
 				}
 
 				for _, sub := range subs {
+
+					// For blocking publish requests
+					// wait for X duration at max & retry
+					// if failing again, don't block this time
+					if !(len(sub) < cap(sub)) {
+						<-time.After(req.BlockFor)
+					}
 
 					// Checking whether receiver channel has enough buffer space
 					// to hold this message or not
@@ -166,6 +176,26 @@ func (p *PubSub) Publish(msg *Message) (bool, uint64) {
 
 		return true, <-resChan
 
+	}
+
+	return false, 0
+
+}
+
+// BPublish - Publish message to N-many topics and block for at max `delay`
+// if any subscriber of any of those topics are not having enough buffer
+// space
+//
+// Please note, hub attempts to send message on subscriber channel
+// if finds lack of space, wait for `delay` & retries. This time too if it fails
+// to find enough space, it'll return back immediately.
+func (p *PubSub) BPublish(msg *Message, delay time.Duration) (bool, uint64) {
+
+	if p.Alive {
+		resChan := make(chan uint64)
+		p.MessageChan <- &PublishRequest{Message: msg, BlockFor: delay, ResponseChan: resChan}
+
+		return true, <-resChan
 	}
 
 	return false, 0
