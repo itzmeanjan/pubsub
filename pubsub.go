@@ -58,6 +58,19 @@ func (p *PubSub) AllowUnsafe() bool {
 	return <-resChan
 }
 
+// OnlySafe - You'll probably never require to use this method
+// if you've not explicitly disabled safety lock by invoking `AllowUnsafe` ( 👆)
+//
+// But you've & in runtime you need to again enable safety mode, you can call this
+// method & all messages published are going to be copied for each subscriber
+// which will make ops slower that SAFETY lock disabled mode
+func (p *PubSub) OnlySafe() bool {
+	resChan := make(chan bool)
+	p.SafetyChan <- &SafetyMode{Enable: true, ResponseChan: resChan}
+
+	return <-resChan
+}
+
 // Start - Handles request from publishers & subscribers, so that
 // message publishing can be abstracted
 //
@@ -121,7 +134,9 @@ func (p *PubSub) Start(ctx context.Context) {
 						// of publishers/ subscribers make any modification
 						// to that slice, it'll be reflected for all parties involved
 						//
-						// So it's better to give everyone their exclusive copy
+						// So it's better to give everyone their exclusive copy, when
+						// SAFETY mode is enabled, which HUB enables by default
+						// for you
 						copied := make([]byte, len(req.Message.Data))
 						n := copy(copied, req.Message.Data)
 						if n != len(req.Message.Data) {
