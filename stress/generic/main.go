@@ -125,7 +125,7 @@ func main() {
 
 	var rollAfter = flag.Duration("rollAfter", time.Duration(4)*time.Second, "calculate performance & roll to zero, after duration")
 	var parties = flag.Uint64("parties", 2, "#-of producers, consumers & topics involved in simulation")
-	var unsafe = flag.Bool("unsafe", false, "don't copy messages for each subcriber i.e. FASTer")
+	var unsafe = flag.Bool("unsafe", false, "avoid copying messages for each subcriber i.e. FASTer")
 	flag.Parse()
 
 	ctx, cancel := context.WithCancel(context.Background())
