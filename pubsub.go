@@ -10,13 +10,14 @@ import (
 //
 // In other words state manager of Pub/Sub system
 type PubSub struct {
-	Unsafe           bool
+	SafetyMode       bool
 	Alive            bool
 	Index            uint64
 	MessageChan      chan *PublishRequest
 	SubscriberIdChan chan chan uint64
 	SubscribeChan    chan *SubscriptionRequest
 	UnsubscribeChan  chan *UnsubscriptionRequest
+	SafetyChan       chan *SafetyMode
 	Subscribers      map[string]map[uint64]chan *PublishedMessage
 }
 
@@ -24,13 +25,14 @@ type PubSub struct {
 // can be routed to various topics
 func New() *PubSub {
 	return &PubSub{
-		Unsafe:           false,
+		SafetyMode:       true,
 		Alive:            false,
 		Index:            1,
 		MessageChan:      make(chan *PublishRequest, 1),
 		SubscriberIdChan: make(chan chan uint64, 1),
 		SubscribeChan:    make(chan *SubscriptionRequest, 1),
 		UnsubscribeChan:  make(chan *UnsubscriptionRequest, 1),
+		SafetyChan:       make(chan *SafetyMode, 1),
 		Subscribers:      make(map[string]map[uint64]chan *PublishedMessage),
 	}
 }
@@ -49,8 +51,11 @@ func New() *PubSub {
 // data than ever **FASTer ⭐️**
 //
 // ❗️ But remember this might bring problems for you
-func (p *PubSub) AllowUnsafe() {
-	p.Unsafe = true
+func (p *PubSub) AllowUnsafe() bool {
+	resChan := make(chan bool)
+	p.SafetyChan <- &SafetyMode{Enable: false, ResponseChan: resChan}
+
+	return <-resChan
 }
 
 // Start - Handles request from publishers & subscribers, so that
@@ -99,7 +104,7 @@ func (p *PubSub) Start(ctx context.Context) {
 						// Only when user has explicitly disabled
 						// SAFETY lock, just passing message reference
 						// to all subscribers, without copying from original
-						if p.Unsafe {
+						if !p.SafetyMode {
 							msg := PublishedMessage{
 								Data:  req.Message.Data,
 								Topic: topic,
@@ -191,6 +196,11 @@ func (p *PubSub) Start(ctx context.Context) {
 			}
 
 			req.ResponseChan <- unsubscribedFrom
+
+		case req := <-p.SafetyChan:
+
+			p.SafetyMode = req.Enable
+			req.ResponseChan <- true
 
 		}
 

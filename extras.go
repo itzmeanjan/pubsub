@@ -36,3 +36,10 @@ type UnsubscriptionRequest struct {
 	Topics       []string
 	ResponseChan chan uint64
 }
+
+// SafetyMode - For enabling/ disabling SAFETY lock
+// message to be sent to HUB in this form
+type SafetyMode struct {
+	Enable       bool
+	ResponseChan chan bool
+}
