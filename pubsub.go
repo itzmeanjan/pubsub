@@ -52,10 +52,14 @@ func New() *PubSub {
 //
 // ❗️ But remember this might bring problems for you
 func (p *PubSub) AllowUnsafe() bool {
-	resChan := make(chan bool)
-	p.SafetyChan <- &SafetyMode{Enable: false, ResponseChan: resChan}
+	if p.Alive {
+		resChan := make(chan bool)
+		p.SafetyChan <- &SafetyMode{Enable: false, ResponseChan: resChan}
 
-	return <-resChan
+		return <-resChan
+	}
+
+	return false
 }
 
 // OnlySafe - You'll probably never require to use this method
@@ -65,10 +69,14 @@ func (p *PubSub) AllowUnsafe() bool {
 // method & all messages published are going to be copied for each subscriber
 // which will make ops slower that SAFETY lock disabled mode
 func (p *PubSub) OnlySafe() bool {
-	resChan := make(chan bool)
-	p.SafetyChan <- &SafetyMode{Enable: true, ResponseChan: resChan}
+	if p.Alive {
+		resChan := make(chan bool)
+		p.SafetyChan <- &SafetyMode{Enable: true, ResponseChan: resChan}
 
-	return <-resChan
+		return <-resChan
+	}
+
+	return false
 }
 
 // Start - Handles request from publishers & subscribers, so that
