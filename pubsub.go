@@ -10,6 +10,7 @@ import (
 //
 // In other words state manager of Pub/Sub system
 type PubSub struct {
+	Unsafe           bool
 	Alive            bool
 	Index            uint64
 	MessageChan      chan *PublishRequest
@@ -23,6 +24,7 @@ type PubSub struct {
 // can be routed to various topics
 func New() *PubSub {
 	return &PubSub{
+		Unsafe:           false,
 		Alive:            false,
 		Index:            1,
 		MessageChan:      make(chan *PublishRequest, 1),
@@ -31,6 +33,24 @@ func New() *PubSub {
 		UnsubscribeChan:  make(chan *UnsubscriptionRequest, 1),
 		Subscribers:      make(map[string]map[uint64]chan *PublishedMessage),
 	}
+}
+
+// AllowUnsafe - Hub allows you to pass slice of messages to N-many
+// topic subscribers & as slices are references if any of those subscribers
+// ( or even publisher itself ) mutates slice it'll be reflected to
+// all parties, which might not be desireable always.
+//
+// But if you're sure that won't cause any problem for you,
+// you can at your own risk disable SAFETY lock
+//
+// If disabled, hub won't anymore attempt to copy slices to
+// for each topic subscriber, it'll simply pass. As this means
+// hub will do lesser work, hub will be able to process more
+// data than ever
+//
+// ❗️ But remember this might bring problems for you
+func (p *PubSub) AllowUnsafe() {
+	p.Unsafe = true
 }
 
 // Start - Handles request from publishers & subscribers, so that
@@ -75,6 +95,21 @@ func (p *PubSub) Start(ctx context.Context) {
 					// Checking whether receiver channel has enough buffer space
 					// to hold this message or not
 					if len(sub) < cap(sub) {
+
+						// Only when user has explicitly disabled
+						// SAFETY lock, just passing message reference
+						// to all subscribers, without copying from original
+						if p.Unsafe {
+							msg := PublishedMessage{
+								Data:  req.Message.Data,
+								Topic: topic,
+							}
+
+							sub <- &msg
+							publishedOn++
+
+							continue
+						}
 
 						// As byte slices are reference types i.e. if we
 						// just pass it over channel to subscribers & either
