@@ -35,13 +35,25 @@ func generateTopics(count int) []string {
 	return topics
 }
 
-func simulate(ctx context.Context, rollAfter time.Duration, parties uint64) {
+func simulate(ctx context.Context, rollAfter time.Duration, parties uint64, unsafe bool) {
 
 	broker := pubsub.New()
 	go broker.Start(ctx)
 	topics := generateTopics(int(parties))
 
 	<-time.After(time.Duration(100) * time.Microsecond)
+
+	// This will make things FASTer, but might
+	// not be always a good idea
+	//
+	// Atleast if you're going to modify same slice
+	// which you used for sending one message
+	// it'll be reflected at every subscriber's side
+	//
+	// Caution : Use with care
+	if unsafe {
+		broker.AllowUnsafe()
+	}
 
 	subscribers := make([]*pubsub.Subscriber, 0, parties)
 	for i := 0; i < int(parties); i++ {
@@ -113,6 +125,7 @@ func main() {
 
 	var rollAfter = flag.Duration("rollAfter", time.Duration(4)*time.Second, "calculate performance & roll to zero, after duration")
 	var parties = flag.Uint64("parties", 2, "#-of producers, consumers & topics involved in simulation")
+	var unsafe = flag.Bool("unsafe", false, "don't copy messages for each subcriber i.e. FASTer")
 	flag.Parse()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -121,7 +134,7 @@ func main() {
 	signal.Notify(interruptChan, syscall.SIGTERM, syscall.SIGINT)
 
 	log.Printf("Pub/Sub Simulation with %d Producers, Consumers & Topics\n", *parties)
-	simulate(ctx, *rollAfter, *parties)
+	simulate(ctx, *rollAfter, *parties, *unsafe)
 
 	<-interruptChan
 	cancel()
