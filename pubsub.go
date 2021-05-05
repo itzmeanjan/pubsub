@@ -46,7 +46,7 @@ func New() *PubSub {
 // If disabled, hub won't anymore attempt to copy slices to
 // for each topic subscriber, it'll simply pass. As this means
 // hub will do lesser work, hub will be able to process more
-// data than ever
+// data than ever **FASTer ⭐️**
 //
 // ❗️ But remember this might bring problems for you
 func (p *PubSub) AllowUnsafe() {

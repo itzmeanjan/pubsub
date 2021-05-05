@@ -131,6 +131,11 @@ func TestPubSub(t *testing.T) {
 		t.Errorf("Expected to receive `%s`, got `%s`", DATA, publishedMessage.Data)
 	}
 
+	// From now on messages won't be copied
+	// just reference to be passed to all topic
+	// subscribers & this is FASTer
+	pubsub.AllowUnsafe()
+
 	for i := 0; i < 8; i++ {
 
 		published, count = pubsub.Publish(&msg)
