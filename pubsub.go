@@ -157,8 +157,8 @@ func (p *PubSub) Subscribe(ctx context.Context, cap int, topics ...string) *Subs
 			ping:   make(chan struct{}, 1),
 			mLock:  &sync.RWMutex{},
 			tLock:  &sync.RWMutex{},
-			buffer: make([]*PublishedMessage, 0, cap),
 			topics: make(map[string]bool),
+			buffer: make([]*PublishedMessage, 0, cap),
 			hub:    p,
 		}
 
@@ -177,6 +177,7 @@ func (p *PubSub) Subscribe(ctx context.Context, cap int, topics ...string) *Subs
 
 		started := make(chan struct{})
 		go sub.Start(ctx, started)
+		<-resChan
 		<-started
 
 		return sub
