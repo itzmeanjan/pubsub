@@ -2,6 +2,7 @@ package pubsub
 
 import (
 	"context"
+	"io"
 	"time"
 )
 
@@ -16,9 +17,11 @@ type PubSub struct {
 	MessageChan      chan *PublishRequest
 	SubscriberIdChan chan chan uint64
 	SubscribeChan    chan *SubscriptionRequest
+	SubscribeChan_   chan *SubscriptionRequest_
 	UnsubscribeChan  chan *UnsubscriptionRequest
 	SafetyChan       chan *SafetyMode
 	Subscribers      map[string]map[uint64]chan *PublishedMessage
+	Subscribers_     map[string]map[uint64]io.Writer
 }
 
 // New - Create a new Pub/Sub hub, using which messages
@@ -197,6 +200,30 @@ func (p *PubSub) Start(ctx context.Context) {
 
 			req.ResponseChan <- subscribedTo
 
+		case req := <-p.SubscribeChan_:
+
+			var subscribedTo uint64
+
+			for topic := range req.Topics {
+
+				subs, ok := p.Subscribers_[topic]
+				if !ok {
+					p.Subscribers_[topic] = make(map[uint64]io.Writer)
+					p.Subscribers_[topic][req.Id] = req.Writer
+					subscribedTo++
+
+					continue
+				}
+
+				if _, ok := subs[req.Id]; !ok {
+					subs[req.Id] = req.Writer
+					subscribedTo++
+				}
+
+			}
+
+			req.ResponseChan <- subscribedTo
+
 		case req := <-p.UnsubscribeChan:
 
 			var unsubscribedFrom uint64
@@ -267,6 +294,40 @@ func (p *PubSub) BPublish(msg *Message, delay time.Duration) (bool, uint64) {
 	}
 
 	return false, 0
+
+}
+
+// Subscribe_ - ...
+func (p *PubSub) Subscribe_(cap uint64, topics ...string) *Subscriber {
+
+	if p.Alive {
+		if len(topics) == 0 {
+			return nil
+		}
+
+		idGenChan := make(chan uint64)
+		p.SubscriberIdChan <- idGenChan
+
+		r, w := io.Pipe()
+		sub := &Subscriber{
+			Id:     <-idGenChan,
+			Reader: r,
+			Topics: make(map[string]bool),
+		}
+
+		for i := 0; i < len(topics); i++ {
+			sub.Topics[topics[i]] = true
+		}
+
+		resChan := make(chan uint64)
+		p.SubscribeChan_ <- &SubscriptionRequest_{Id: sub.Id, Writer: w, Topics: sub.Topics, ResponseChan: resChan}
+		// Intentionally being ignored
+		<-resChan
+
+		return sub
+	}
+
+	return nil
 
 }
 

@@ -1,12 +1,16 @@
 package pubsub
 
-import "time"
+import (
+	"io"
+	"time"
+)
 
 // Subscriber - Uniquely identifiable subscriber with multiple
 // subscribed topics from where it wishes to listen from over single channel
 type Subscriber struct {
 	Id      uint64
 	Channel chan *PublishedMessage
+	Reader  io.Reader
 	Topics  map[string]bool
 }
 

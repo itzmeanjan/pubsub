@@ -1,11 +1,14 @@
 package pubsub
 
-import "time"
+import (
+	"io"
+	"time"
+)
 
 // Message - Publisher showing intent of publishing arbitrary byte slice to topics
 type Message struct {
 	Topics []string
-	Data   []byte
+	Data   Binary
 }
 
 // PublishRequest - Publisher will show interest of publication using this form,
@@ -20,6 +23,14 @@ type PublishRequest struct {
 type PublishedMessage struct {
 	Topic string
 	Data  []byte
+}
+
+// SubscriptionRequest_ - ...
+type SubscriptionRequest_ struct {
+	Id           uint64
+	Writer       io.Writer
+	Topics       map[string]bool
+	ResponseChan chan uint64
 }
 
 // SubscriptionRequest - Subscriber to send topic subscription request in this form,
