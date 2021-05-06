@@ -18,7 +18,6 @@ type PubSub struct {
 	SubscriberIdChan chan chan uint64
 	SubscribeChan    chan *SubscriptionRequest
 	UnsubscribeChan  chan *UnsubscriptionRequest
-	SafetyChan       chan *SafetyMode
 	Subscribers      map[string]map[uint64]io.Writer
 }
 
@@ -26,58 +25,14 @@ type PubSub struct {
 // can be routed to various topics
 func New() *PubSub {
 	return &PubSub{
-		SafetyMode:       true,
 		Alive:            false,
 		Index:            1,
 		MessageChan:      make(chan *PublishRequest, 1),
 		SubscriberIdChan: make(chan chan uint64, 1),
 		SubscribeChan:    make(chan *SubscriptionRequest, 1),
 		UnsubscribeChan:  make(chan *UnsubscriptionRequest, 1),
-		SafetyChan:       make(chan *SafetyMode, 1),
 		Subscribers:      make(map[string]map[uint64]io.Writer),
 	}
-}
-
-// AllowUnsafe - Hub allows you to pass slice of messages to N-many
-// topic subscribers & as slices are references if any of those subscribers
-// ( or even publisher itself ) mutates slice it'll be reflected to
-// all parties, which might not be desireable always.
-//
-// But if you're sure that won't cause any problem for you,
-// you can at your own risk disable SAFETY lock
-//
-// If disabled, hub won't anymore attempt to copy slices to
-// for each topic subscriber, it'll simply pass. As this means
-// hub will do lesser work, hub will be able to process more
-// data than ever **FASTer ⭐️**
-//
-// ❗️ But remember this might bring problems for you
-func (p *PubSub) AllowUnsafe() bool {
-	if p.Alive {
-		resChan := make(chan bool)
-		p.SafetyChan <- &SafetyMode{Enable: false, ResponseChan: resChan}
-
-		return <-resChan
-	}
-
-	return false
-}
-
-// OnlySafe - You'll probably never require to use this method
-// if you've not explicitly disabled safety lock by invoking `AllowUnsafe` ( 👆)
-//
-// But you've & in runtime you need to again enable safety mode, you can call this
-// method & all messages published are going to be copied for each subscriber
-// which will make ops slower that SAFETY lock disabled mode
-func (p *PubSub) OnlySafe() bool {
-	if p.Alive {
-		resChan := make(chan bool)
-		p.SafetyChan <- &SafetyMode{Enable: true, ResponseChan: resChan}
-
-		return <-resChan
-	}
-
-	return false
 }
 
 // Start - Handles request from publishers & subscribers, so that
@@ -101,7 +56,7 @@ func (p *PubSub) Start(ctx context.Context) {
 		case req := <-p.MessageChan:
 
 			var publishedOn uint64
-			var writers = make([]io.Writer, 0, 1)
+			var writers = make([]io.Writer, 0)
 			var _writers = make(map[io.Writer]bool)
 
 			for i := 0; i < len(req.Message.Topics); i++ {
@@ -173,23 +128,13 @@ func (p *PubSub) Start(ctx context.Context) {
 
 			req.ResponseChan <- unsubscribedFrom
 
-		case req := <-p.SafetyChan:
-
-			p.SafetyMode = req.Enable
-			req.ResponseChan <- true
-
 		}
 
 	}
 
 }
 
-// Publish - Publish message to N-many topics, receives how many of
-// subscribers are receiving ( will receive ) copy of this message
-//
-// Response will only be negative if Pub/Sub system has stopped running
 func (p *PubSub) Publish(msg *Message) (bool, uint64) {
-
 	if p.Alive {
 		resChan := make(chan uint64)
 		p.MessageChan <- &PublishRequest{Message: msg, ResponseChan: resChan}
@@ -198,26 +143,21 @@ func (p *PubSub) Publish(msg *Message) (bool, uint64) {
 	}
 
 	return false, 0
-
-}
-
-func (p *PubSub) nextId() uint64 {
-	resChan := make(chan uint64)
-	p.SubscriberIdChan <- resChan
-
-	return <-resChan
 }
 
 func (p *PubSub) Subscribe(cap int, topics ...string) *Subscriber {
-
 	if p.Alive {
 		if len(topics) == 0 {
 			return nil
 		}
-
+		ok, id := p.nextId()
+		if !ok {
+			return nil
+		}
 		r, w := io.Pipe()
+
 		sub := &Subscriber{
-			Id:     p.nextId(),
+			Id:     id,
 			Reader: r,
 			Writer: w,
 			mLock:  &sync.RWMutex{},
@@ -244,7 +184,17 @@ func (p *PubSub) Subscribe(cap int, topics ...string) *Subscriber {
 	}
 
 	return nil
+}
 
+func (p *PubSub) nextId() (bool, uint64) {
+	if p.Alive {
+		resChan := make(chan uint64)
+		p.SubscriberIdChan <- resChan
+
+		return true, <-resChan
+	}
+
+	return false, 0
 }
 
 func (p *PubSub) addSubscription(subReq *SubscriptionRequest) (bool, uint64) {
