@@ -104,6 +104,7 @@ func (p *PubSub) Start(ctx context.Context) {
 
 			var publishedOn uint64
 			var writers = make([]io.Writer, 0, 1)
+			var _writers = make(map[io.Writer]bool)
 
 			for i := 0; i < len(req.Message.Topics); i++ {
 				topic := req.Message.Topics[i]
@@ -113,7 +114,12 @@ func (p *PubSub) Start(ctx context.Context) {
 				}
 
 				for _, w := range subs {
+					if _, ok := _writers[w]; ok {
+						continue
+					}
+
 					writers = append(writers, w)
+					_writers[w] = true
 					publishedOn++
 				}
 			}
