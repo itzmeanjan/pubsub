@@ -11,6 +11,7 @@ type Subscriber struct {
 	Id      uint64
 	Channel chan *PublishedMessage
 	Reader  io.Reader
+	Writer  io.Writer
 	Topics  map[string]bool
 }
 

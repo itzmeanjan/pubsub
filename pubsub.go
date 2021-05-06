@@ -263,6 +263,7 @@ func (p *PubSub) Subscribe_(cap uint64, topics ...string) *Subscriber {
 		sub := &Subscriber{
 			Id:     <-idGenChan,
 			Reader: r,
+			Writer: w,
 			Topics: make(map[string]bool),
 		}
 
@@ -271,51 +272,16 @@ func (p *PubSub) Subscribe_(cap uint64, topics ...string) *Subscriber {
 		}
 
 		resChan := make(chan uint64)
-		p.SubscribeChan_ <- &SubscriptionRequest_{Id: sub.Id, Writer: w, Topics: sub.Topics, ResponseChan: resChan}
+		p.SubscribeChan_ <- &SubscriptionRequest_{
+			Id:           sub.Id,
+			Writer:       w,
+			Topics:       sub.Topics,
+			ResponseChan: resChan,
+		}
 		// Intentionally being ignored
 		<-resChan
 
 		return sub
-	}
-
-	return nil
-
-}
-
-// Subscribe - Subscribes to topics for first time, new client gets created
-//
-// Use this client to add more subscriptions to topics/ unsubscribe from topics/
-// receive published messages etc.
-//
-// Response will only be nil if Pub/Sub system has stopped running
-func (p *PubSub) Subscribe(cap uint64, topics ...string) *Subscriber {
-
-	if p.Alive {
-
-		if len(topics) == 0 {
-			return nil
-		}
-
-		idGenChan := make(chan uint64)
-		p.SubscriberIdChan <- idGenChan
-
-		sub := &Subscriber{
-			Id:      <-idGenChan,
-			Channel: make(chan *PublishedMessage, cap),
-			Topics:  make(map[string]bool),
-		}
-
-		for i := 0; i < len(topics); i++ {
-			sub.Topics[topics[i]] = true
-		}
-
-		resChan := make(chan uint64)
-		p.SubscribeChan <- &SubscriptionRequest{Subscriber: sub, ResponseChan: resChan}
-		// Intentionally being ignored
-		<-resChan
-
-		return sub
-
 	}
 
 	return nil
@@ -328,39 +294,35 @@ func (p *PubSub) Subscribe(cap uint64, topics ...string) *Subscriber {
 func (p *PubSub) AddSubscription(subscriber *Subscriber, topics ...string) (bool, uint64) {
 
 	if p.Alive {
-
 		if len(topics) == 0 {
 			return true, 0
 		}
 
-		_subscriber := &Subscriber{
-			Id:      subscriber.Id,
-			Channel: subscriber.Channel,
-			Topics:  make(map[string]bool),
-		}
+		_topics := make(map[string]bool)
 
 		for i := 0; i < len(topics); i++ {
-
 			if state, ok := subscriber.Topics[topics[i]]; ok {
 				if state {
 					continue
 				}
 			}
 
-			_subscriber.Topics[topics[i]] = true
+			_topics[topics[i]] = true
 			subscriber.Topics[topics[i]] = true
-
 		}
 
-		if len(_subscriber.Topics) == 0 {
+		if len(_topics) == 0 {
 			return true, 0
 		}
 
 		resChan := make(chan uint64)
-		p.SubscribeChan <- &SubscriptionRequest{Subscriber: _subscriber, ResponseChan: resChan}
-
+		p.SubscribeChan_ <- &SubscriptionRequest_{
+			Id:           subscriber.Id,
+			Writer:       subscriber.Writer,
+			Topics:       _topics,
+			ResponseChan: resChan,
+		}
 		return true, <-resChan
-
 	}
 
 	return false, 0
