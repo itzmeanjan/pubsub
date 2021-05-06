@@ -1,6 +1,7 @@
 package pubsub
 
 import (
+	"context"
 	"io"
 	"sync"
 )
@@ -18,8 +19,14 @@ type Subscriber struct {
 	hub    *PubSub
 }
 
-func (s *Subscriber) Start() {
+func (s *Subscriber) Start(ctx context.Context) {
 	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
 		b := new(Binary)
 		if _, err := b.ReadFrom(s.Reader); err != nil {
 			continue
@@ -50,6 +57,9 @@ func (s *Subscriber) Next() *PublishedMessage {
 }
 
 func (s *Subscriber) AddSubscription(topics ...string) (bool, uint64) {
+	s.tLock.Lock()
+	defer s.tLock.Unlock()
+
 	for i := 0; i < len(topics); i++ {
 		s.Topics[topics[i]] = true
 	}
@@ -62,6 +72,9 @@ func (s *Subscriber) AddSubscription(topics ...string) (bool, uint64) {
 }
 
 func (s *Subscriber) Unsubscribe(topics ...string) (bool, uint64) {
+	s.tLock.Lock()
+	defer s.tLock.Unlock()
+
 	for i := 0; i < len(topics); i++ {
 		s.Topics[topics[i]] = false
 	}
@@ -75,25 +88,11 @@ func (s *Subscriber) Unsubscribe(topics ...string) (bool, uint64) {
 func (s *Subscriber) UnsubscribeAll() (bool, uint64) {
 	topics := make([]string, 0, len(s.Topics))
 
+	s.tLock.RLock()
 	for k := range s.Topics {
 		topics = append(topics, k)
 	}
+	s.tLock.RUnlock()
 
 	return s.Unsubscribe(topics...)
-}
-
-// Close - Destroys subscriber
-func (s *Subscriber) Close() bool {
-
-	for {
-		if msg := s.Next(); msg == nil {
-			break
-		}
-	}
-
-	for topic := range s.Topics {
-		delete(s.Topics, topic)
-	}
-
-	return true
 }
