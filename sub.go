@@ -1,8 +1,8 @@
 package pubsub
 
 import (
-	"context"
 	"io"
+	"sync"
 )
 
 // Subscriber - Uniquely identifiable subscriber with multiple
@@ -11,59 +11,45 @@ type Subscriber struct {
 	Id             uint64
 	Reader         io.Reader
 	Writer         io.Writer
-	Topics         map[string]bool
-	NextChan       chan chan *PublishedMessage
+	mLock          *sync.RWMutex
+	tLock          *sync.RWMutex
 	NewMessageChan chan *PublishedMessage
+	NextChan       chan chan *PublishedMessage
+	NewTopicChan   chan []string
+	Topics         map[string]bool
 	Buffer         []*PublishedMessage
 	Hub            *PubSub
 }
 
-func (s *Subscriber) Consume() {
+func (s *Subscriber) Start() {
 	for {
 		b := new(Binary)
 		if _, err := b.ReadFrom(s.Reader); err != nil {
 			continue
 		}
 
-		s.NewMessageChan <- &PublishedMessage{Data: *b}
+		s.mLock.Lock()
+		s.Buffer = append(s.Buffer, &PublishedMessage{Data: *b})
+		s.mLock.Unlock()
 	}
 }
 
-func (s *Subscriber) Start(ctx context.Context) {
-
-	for {
-
-		select {
-		case <-ctx.Done():
-			return
-
-		case msg := <-s.NewMessageChan:
-			s.Buffer = append(s.Buffer, msg)
-
-		case req := <-s.NextChan:
-			if len(s.Buffer) == 0 {
-				req <- nil
-				break
-			}
-			req <- s.Buffer[0]
-
-			copy(s.Buffer[:], s.Buffer[1:])
-			s.Buffer[len(s.Buffer)-1] = nil
-			s.Buffer = s.Buffer[:len(s.Buffer)-1]
-		}
-
-	}
-
-}
-
-// Next - ...
 func (s *Subscriber) Next() *PublishedMessage {
-	b := new(Binary)
-	if _, err := b.ReadFrom(s.Reader); err != nil {
+	s.mLock.Lock()
+	defer s.mLock.Unlock()
+
+	if len(s.Buffer) == 0 {
 		return nil
 	}
 
-	return &PublishedMessage{Data: *b}
+	msg := s.Buffer[0]
+	n := len(s.Buffer)
+
+	copy(s.Buffer[:], s.Buffer[1:])
+	s.Buffer[n-1] = nil
+	s.Buffer = s.Buffer[:n-1]
+
+	return msg
 }
 
 // AddSubscription - Subscribe to topics using existing pub/sub client
