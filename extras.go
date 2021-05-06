@@ -22,7 +22,7 @@ type PublishRequest struct {
 // PublishedMessage - Once a message is published on a topic, subscriber to receive it in this form
 type PublishedMessage struct {
 	Topic string
-	Data  []byte
+	Data  Binary
 }
 
 // SubscriptionRequest_ - ...

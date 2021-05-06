@@ -14,6 +14,16 @@ type Subscriber struct {
 	Topics  map[string]bool
 }
 
+// Next_ - ...
+func (s *Subscriber) Next_() *PublishedMessage {
+	b := new(Binary)
+	if _, err := b.ReadFrom(s.Reader); err != nil {
+		return nil
+	}
+
+	return &PublishedMessage{Data: *b}
+}
+
 // Next - Read from channel if anything is immediately available
 // otherwise just return i.e. it's non-blocking op
 func (s *Subscriber) Next() *PublishedMessage {
