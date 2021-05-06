@@ -20,7 +20,9 @@ type Subscriber struct {
 	hub    *PubSub
 }
 
-func (s *Subscriber) Start(ctx context.Context) {
+func (s *Subscriber) Start(ctx context.Context, started chan struct{}) {
+	close(started)
+
 	for {
 
 		select {
