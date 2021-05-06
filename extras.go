@@ -28,6 +28,7 @@ type PublishedMessage struct {
 // SubscriptionRequest - ...
 type SubscriptionRequest struct {
 	Id           uint64
+	Ping         chan struct{}
 	Writer       io.Writer
 	Topics       []string
 	ResponseChan chan uint64
@@ -41,9 +42,7 @@ type UnsubscriptionRequest struct {
 	ResponseChan chan uint64
 }
 
-// SafetyMode - For enabling/ disabling SAFETY lock
-// message to be sent to HUB in this form
-type SafetyMode struct {
-	Enable       bool
-	ResponseChan chan bool
+type SubscriberInfo struct {
+	Ping   chan struct{}
+	Writer io.Writer
 }

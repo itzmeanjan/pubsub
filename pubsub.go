@@ -155,6 +155,7 @@ func (p *PubSub) Subscribe(ctx context.Context, cap int, topics ...string) *Subs
 			Id:     id,
 			Reader: r,
 			Writer: w,
+			Ping:   make(chan struct{}, 1),
 			mLock:  &sync.RWMutex{},
 			tLock:  &sync.RWMutex{},
 			Buffer: make([]*PublishedMessage, 0, cap),
@@ -169,6 +170,7 @@ func (p *PubSub) Subscribe(ctx context.Context, cap int, topics ...string) *Subs
 		resChan := make(chan uint64)
 		p.SubscribeChan <- &SubscriptionRequest{
 			Id:           sub.Id,
+			Ping:         sub.Ping,
 			Writer:       sub.Writer,
 			Topics:       topics,
 			ResponseChan: resChan,

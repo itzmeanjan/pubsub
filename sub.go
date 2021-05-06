@@ -12,6 +12,7 @@ type Subscriber struct {
 	Id     uint64
 	Reader io.Reader
 	Writer io.Writer
+	Ping   chan struct{}
 	mLock  *sync.RWMutex
 	tLock  *sync.RWMutex
 	Topics map[string]bool
@@ -21,20 +22,27 @@ type Subscriber struct {
 
 func (s *Subscriber) Start(ctx context.Context) {
 	for {
+
 		select {
 		case <-ctx.Done():
 			return
-		default:
+
+		case <-s.Ping:
+			t := new(String)
+			if _, err := t.ReadFrom(s.Reader); err != nil {
+				continue
+			}
+
+			b := new(Binary)
+			if _, err := b.ReadFrom(s.Reader); err != nil {
+				continue
+			}
+
+			s.mLock.Lock()
+			s.Buffer = append(s.Buffer, &PublishedMessage{Topic: t.String(), Data: *b})
+			s.mLock.Unlock()
 		}
 
-		b := new(Binary)
-		if _, err := b.ReadFrom(s.Reader); err != nil {
-			continue
-		}
-
-		s.mLock.Lock()
-		s.Buffer = append(s.Buffer, &PublishedMessage{Data: *b})
-		s.mLock.Unlock()
 	}
 }
 
