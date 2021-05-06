@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"sync"
+	"time"
 )
 
 // PubSub - Pub/Sub Server i.e. holds which clients are subscribed to what topics,
@@ -177,8 +178,9 @@ func (p *PubSub) Subscribe(ctx context.Context, cap int, topics ...string) *Subs
 			ResponseChan: resChan,
 		}
 
-		<-resChan
 		go sub.Start(ctx)
+		<-resChan
+		<-time.After(time.Duration(100) * time.Microsecond)
 
 		return sub
 	}

@@ -51,12 +51,12 @@ func TestPubSub(t *testing.T) {
 		t.Errorf("Expected subscriber count to be 0, got %d", count)
 	}
 
-	subscriber := pubsub.Subscribe(16)
+	subscriber := pubsub.Subscribe(ctx, 16)
 	if subscriber != nil {
 		t.Errorf("Expected no creation of subscriber")
 	}
 
-	subscriber = pubsub.Subscribe(16, TOPIC_1)
+	subscriber = pubsub.Subscribe(ctx, 16, TOPIC_1)
 	if subscriber.Id != 1 {
 		t.Errorf("Expected subscriber id to be 1, got %d", subscriber.Id)
 	}
@@ -64,11 +64,6 @@ func TestPubSub(t *testing.T) {
 	state, ok := subscriber.Topics[TOPIC_1]
 	if !ok || !state {
 		t.Errorf("Expected subscriber to be subscribed to `%s`", TOPIC_1)
-	}
-
-	publishedMessage := subscriber.BNext(DURATION)
-	if publishedMessage != nil {
-		t.Fatalf("Expected to receive no message")
 	}
 
 	published, count = pubsub.Publish(&msg)
@@ -79,12 +74,9 @@ func TestPubSub(t *testing.T) {
 		t.Errorf("Expected subscriber count to be 1, got %d", count)
 	}
 
-	publishedMessage = subscriber.Next()
+	publishedMessage := subscriber.Next()
 	if publishedMessage == nil {
 		t.Fatalf("Expected to receive message")
-	}
-	if publishedMessage.Topic != TOPIC_1 {
-		t.Errorf("Expected to receive message from `%s`, got from `%s`", TOPIC_1, publishedMessage.Topic)
 	}
 	if !bytes.Equal(publishedMessage.Data, DATA) {
 		t.Errorf("Expected to receive `%s`, got `%s`", DATA, publishedMessage.Data)
@@ -99,7 +91,7 @@ func TestPubSub(t *testing.T) {
 		t.Errorf("Expected subscriber count to be 1, got %d", count)
 	}
 
-	state, count = subscriber.AddSubscription(pubsub)
+	state, count = subscriber.AddSubscription()
 	if !state {
 		t.Errorf("Expected to be able to add new topic subscriptions")
 	}
@@ -107,7 +99,7 @@ func TestPubSub(t *testing.T) {
 		t.Errorf("Expected to subscribe to 0 new topic, got %d", count)
 	}
 
-	state, count = subscriber.AddSubscription(pubsub, TOPICS_2...)
+	state, count = subscriber.AddSubscription(TOPICS_2...)
 	if !state {
 		t.Errorf("Expected to be able to add new topic subscriptions")
 	}
@@ -124,20 +116,8 @@ func TestPubSub(t *testing.T) {
 	if publishedMessage == nil {
 		t.Fatalf("Expected to receive message")
 	}
-	if publishedMessage.Topic != TOPIC_1 {
-		t.Errorf("Expected to receive message from `%s`, got from `%s`", TOPIC_1, publishedMessage.Topic)
-	}
 	if !bytes.Equal(publishedMessage.Data, DATA) {
 		t.Errorf("Expected to receive `%s`, got `%s`", DATA, publishedMessage.Data)
-	}
-
-	// -- disabled SAFETY lock
-	//
-	// From now on messages won't be copied
-	// just reference to be passed to all topic
-	// subscribers & this is FASTer
-	if !pubsub.AllowUnsafe() {
-		t.Errorf("Expected to disable SAFETY lock")
 	}
 
 	for i := 0; i < 8; i++ {
@@ -146,23 +126,10 @@ func TestPubSub(t *testing.T) {
 		if !published {
 			t.Errorf("Expected to be able to publish to topic")
 		}
-		if count != 2 {
+		if count != 1 {
 			t.Errorf("Expected subscriber count to be 2, got %d", count)
 		}
 
-	}
-
-	if !pubsub.OnlySafe() {
-		t.Errorf("Expected to enable SAFETY lock")
-	}
-	// -- enabled SAFETY lock
-
-	published, count = pubsub.BPublish(&msg, time.Duration(1)*time.Millisecond)
-	if !published {
-		t.Errorf("Expected to be able to publish to topic")
-	}
-	if count != 0 {
-		t.Errorf("Expected subscriber count to be 0, got %d", count)
 	}
 
 	for i := 0; i < 8; i++ {
@@ -171,32 +138,18 @@ func TestPubSub(t *testing.T) {
 		if publishedMessage == nil {
 			t.Fatalf("Expected to receive message")
 		}
-		if publishedMessage.Topic != TOPIC_1 {
-			t.Errorf("Expected to receive message from `%s`, got from `%s`", TOPIC_1, publishedMessage.Topic)
-		}
-		if !bytes.Equal(publishedMessage.Data, DATA) {
-			t.Errorf("Expected to receive `%s`, got `%s`", DATA, publishedMessage.Data)
-		}
-
-		publishedMessage = subscriber.Next()
-		if publishedMessage == nil {
-			t.Fatalf("Expected to receive message")
-		}
-		if publishedMessage.Topic != TOPIC_2 {
-			t.Errorf("Expected to receive message from `%s`, got from `%s`", TOPIC_2, publishedMessage.Topic)
-		}
 		if !bytes.Equal(publishedMessage.Data, DATA) {
 			t.Errorf("Expected to receive `%s`, got `%s`", DATA, publishedMessage.Data)
 		}
 
 	}
 
-	publishedMessage = subscriber.BNext(DURATION)
+	publishedMessage = subscriber.Next()
 	if publishedMessage != nil {
 		t.Fatalf("Expected to receive no message")
 	}
 
-	state, count = subscriber.Unsubscribe(pubsub)
+	state, count = subscriber.Unsubscribe()
 	if !state {
 		t.Errorf("Expected to be able to unsubscribe")
 	}
@@ -204,7 +157,7 @@ func TestPubSub(t *testing.T) {
 		t.Errorf("Expected to unsubscribe from 0 topic, got %d", count)
 	}
 
-	state, count = subscriber.Unsubscribe(pubsub, TOPIC_1)
+	state, count = subscriber.Unsubscribe(TOPIC_1)
 	if !state {
 		t.Errorf("Expected to be able to unsubscribe")
 	}
@@ -217,7 +170,7 @@ func TestPubSub(t *testing.T) {
 		t.Errorf("Expected to unsubscribe from `%s`", TOPIC_1)
 	}
 
-	state, count = subscriber.UnsubscribeAll(pubsub)
+	state, count = subscriber.UnsubscribeAll()
 	if !state {
 		t.Errorf("Expected to be able to unsubscribe")
 	}
@@ -230,7 +183,7 @@ func TestPubSub(t *testing.T) {
 		t.Errorf("Expected to unsubscribe from `%s`", TOPIC_2)
 	}
 
-	state, count = subscriber.Unsubscribe(pubsub, TOPICS_2...)
+	state, count = subscriber.Unsubscribe(TOPICS_2...)
 	if !state {
 		t.Errorf("Expected to be able to unsubscribe")
 	}
@@ -238,7 +191,7 @@ func TestPubSub(t *testing.T) {
 		t.Errorf("Expected to unsubscribe from 0 topic, got %d", count)
 	}
 
-	state, count = subscriber.UnsubscribeAll(pubsub)
+	state, count = subscriber.UnsubscribeAll()
 	if !state {
 		t.Errorf("Expected to be able to unsubscribe")
 	}
@@ -257,30 +210,22 @@ func TestPubSub(t *testing.T) {
 		t.Errorf("Expected pub/sub system to be down")
 	}
 
-	if pubsub.OnlySafe() {
-		t.Errorf("Expected pub/sub system to be down")
-	}
-
-	state, _ = subscriber.AddSubscription(pubsub)
+	state, _ = subscriber.AddSubscription()
 	if state {
 		t.Errorf("Expected pub/sub system to be down")
 	}
 
-	state, _ = subscriber.Unsubscribe(pubsub)
+	state, _ = subscriber.Unsubscribe()
 	if state {
 		t.Errorf("Expected pub/sub system to be down")
 	}
 
-	state, _ = subscriber.UnsubscribeAll(pubsub)
+	state, _ = subscriber.UnsubscribeAll()
 	if state {
 		t.Errorf("Expected pub/sub system to be down")
 	}
 
-	if !subscriber.Close() {
-		t.Errorf("Expected to be able to close subscriber")
-	}
-
-	subscriber = pubsub.Subscribe(16)
+	subscriber = pubsub.Subscribe(context.Background(), 16)
 	if subscriber != nil {
 		t.Errorf("Expected pub/sub system to be down")
 	}
