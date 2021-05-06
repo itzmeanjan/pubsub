@@ -46,7 +46,6 @@ func (p *PubSub) Start(ctx context.Context) {
 	p.Alive = true
 
 	for {
-
 		select {
 
 		case <-ctx.Done():
@@ -129,7 +128,6 @@ func (p *PubSub) Start(ctx context.Context) {
 			req.ResponseChan <- unsubscribedFrom
 
 		}
-
 	}
 
 }
@@ -145,7 +143,7 @@ func (p *PubSub) Publish(msg *Message) (bool, uint64) {
 	return false, 0
 }
 
-func (p *PubSub) Subscribe(cap int, topics ...string) *Subscriber {
+func (p *PubSub) Subscribe(ctx context.Context, cap int, topics ...string) *Subscriber {
 	if p.Alive {
 		if len(topics) == 0 {
 			return nil
@@ -178,7 +176,9 @@ func (p *PubSub) Subscribe(cap int, topics ...string) *Subscriber {
 			Topics:       topics,
 			ResponseChan: resChan,
 		}
+
 		<-resChan
+		go sub.Start(ctx)
 
 		return sub
 	}
