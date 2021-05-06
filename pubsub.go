@@ -224,7 +224,7 @@ func (p *PubSub) Subscribe(cap int, topics ...string) *Subscriber {
 			tLock:  &sync.RWMutex{},
 			Buffer: make([]*PublishedMessage, 0, cap),
 			Topics: make(map[string]bool),
-			Hub:    p,
+			hub:    p,
 		}
 
 		for i := 0; i < len(topics); i++ {
@@ -245,6 +245,18 @@ func (p *PubSub) Subscribe(cap int, topics ...string) *Subscriber {
 
 	return nil
 
+}
+
+func (p *PubSub) addSubscription(subReq *SubscriptionRequest) (bool, uint64) {
+	if p.Alive {
+		resChan := make(chan uint64)
+		subReq.ResponseChan = resChan
+		p.SubscribeChan <- subReq
+
+		return true, <-resChan
+	}
+
+	return false, 0
 }
 
 // AddSubscription - Use existing subscriber client to subscribe to more topics

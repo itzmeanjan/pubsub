@@ -15,7 +15,7 @@ type Subscriber struct {
 	tLock  *sync.RWMutex
 	Topics map[string]bool
 	Buffer []*PublishedMessage
-	Hub    *PubSub
+	hub    *PubSub
 }
 
 func (s *Subscriber) Start() {
@@ -49,9 +49,12 @@ func (s *Subscriber) Next() *PublishedMessage {
 	return msg
 }
 
-// AddSubscription - Subscribe to topics using existing pub/sub client
-func (s *Subscriber) AddSubscription(pubsub *PubSub, topics ...string) (bool, uint64) {
-	return pubsub.AddSubscription(s, topics...)
+func (s *Subscriber) AddSubscription(topics ...string) (bool, uint64) {
+	return s.hub.addSubscription(&SubscriptionRequest{
+		Id:     s.Id,
+		Writer: s.Writer,
+		Topics: topics,
+	})
 }
 
 // Unsubscribe - Unsubscribe from topics, if subscribed to them using this client
