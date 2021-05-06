@@ -158,8 +158,8 @@ func (p *PubSub) Start(ctx context.Context) {
 
 			var subscribedTo uint64
 
-			for topic := range req.Topics {
-
+			for i := 0; i < len(req.Topics); i++ {
+				topic := req.Topics[i]
 				subs, ok := p.Subscribers_[topic]
 				if !ok {
 					p.Subscribers_[topic] = make(map[uint64]io.Writer)
@@ -173,7 +173,6 @@ func (p *PubSub) Start(ctx context.Context) {
 					subs[req.Id] = req.Writer
 					subscribedTo++
 				}
-
 			}
 
 			req.ResponseChan <- subscribedTo
@@ -275,7 +274,7 @@ func (p *PubSub) Subscribe_(cap uint64, topics ...string) *Subscriber {
 		p.SubscribeChan_ <- &SubscriptionRequest_{
 			Id:           sub.Id,
 			Writer:       w,
-			Topics:       sub.Topics,
+			Topics:       topics,
 			ResponseChan: resChan,
 		}
 		// Intentionally being ignored
@@ -298,28 +297,19 @@ func (p *PubSub) AddSubscription(subscriber *Subscriber, topics ...string) (bool
 			return true, 0
 		}
 
-		_topics := make(map[string]bool)
-
 		for i := 0; i < len(topics); i++ {
-			if state, ok := subscriber.Topics[topics[i]]; ok {
-				if state {
-					continue
-				}
+			if state, ok := subscriber.Topics[topics[i]]; ok && state {
+				continue
 			}
 
-			_topics[topics[i]] = true
 			subscriber.Topics[topics[i]] = true
-		}
-
-		if len(_topics) == 0 {
-			return true, 0
 		}
 
 		resChan := make(chan uint64)
 		p.SubscribeChan_ <- &SubscriptionRequest_{
 			Id:           subscriber.Id,
 			Writer:       subscriber.Writer,
-			Topics:       _topics,
+			Topics:       topics,
 			ResponseChan: resChan,
 		}
 		return true, <-resChan

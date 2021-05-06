@@ -29,7 +29,7 @@ type PublishedMessage struct {
 type SubscriptionRequest_ struct {
 	Id           uint64
 	Writer       io.Writer
-	Topics       map[string]bool
+	Topics       []string
 	ResponseChan chan uint64
 }
 
