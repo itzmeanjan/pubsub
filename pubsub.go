@@ -183,20 +183,17 @@ func (p *PubSub) Start(ctx context.Context) {
 			var unsubscribedFrom uint64
 
 			for i := 0; i < len(req.Topics); i++ {
-
-				if subs, ok := p.Subscribers[req.Topics[i]]; ok {
-
+				topic := req.Topics[i]
+				if subs, ok := p.Subscribers_[topic]; ok {
 					if _, ok := subs[req.Id]; ok {
 						delete(subs, req.Id)
 						unsubscribedFrom++
 					}
 
 					if len(subs) == 0 {
-						delete(p.Subscribers, req.Topics[i])
+						delete(p.Subscribers_, topic)
 					}
-
 				}
-
 			}
 
 			req.ResponseChan <- unsubscribedFrom
