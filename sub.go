@@ -68,6 +68,10 @@ func (s *Subscriber) Next() *PublishedMessage {
 }
 
 func (s *Subscriber) AddSubscription(topics ...string) (bool, uint64) {
+	if len(topics) == 0 {
+		return s.hub.Alive, 0
+	}
+
 	s.tLock.Lock()
 	defer s.tLock.Unlock()
 
@@ -84,6 +88,10 @@ func (s *Subscriber) AddSubscription(topics ...string) (bool, uint64) {
 }
 
 func (s *Subscriber) Unsubscribe(topics ...string) (bool, uint64) {
+	if len(topics) == 0 {
+		return s.hub.Alive, 0
+	}
+
 	s.tLock.Lock()
 	defer s.tLock.Unlock()
 
@@ -101,8 +109,10 @@ func (s *Subscriber) UnsubscribeAll() (bool, uint64) {
 	topics := make([]string, 0, len(s.topics))
 
 	s.tLock.RLock()
-	for k := range s.topics {
-		topics = append(topics, k)
+	for k, v := range s.topics {
+		if v {
+			topics = append(topics, k)
+		}
 	}
 	s.tLock.RUnlock()
 
