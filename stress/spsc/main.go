@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"log"
 	"math/rand"
 	"os"
@@ -24,7 +25,7 @@ func getRandomByteSlice(len int) []byte {
 	return buffer
 }
 
-func simulate(target uint64) (bool, uint64, time.Duration) {
+func simulate(target uint64, unsafe bool) (bool, uint64, time.Duration) {
 
 	broker := pubsub.New()
 
@@ -33,6 +34,18 @@ func simulate(target uint64) (bool, uint64, time.Duration) {
 	defer cancel()
 
 	<-time.After(time.Duration(100) * time.Microsecond)
+
+	// This will make things FASTer, but might
+	// not be always a good idea
+	//
+	// Atleast if you're going to modify same slice
+	// which you used for sending one message
+	// it'll be reflected at every subscriber's side
+	//
+	// Caution : Use with care
+	if unsafe {
+		broker.AllowUnsafe()
+	}
 
 	subscriber := broker.Subscribe(target, "topic_1")
 	if subscriber == nil {
@@ -89,6 +102,9 @@ func simulate(target uint64) (bool, uint64, time.Duration) {
 
 func main() {
 
+	var unsafe = flag.Bool("unsafe", false, "avoid copying messages for each subcriber i.e. FASTer")
+	flag.Parse()
+
 	table := tablewriter.NewWriter(os.Stdout)
 	table.SetHeader([]string{"Produced Data", "Consumed Data", "Time"})
 	table.SetCaption(true, "Single Producer Single Consumer")
@@ -97,7 +113,7 @@ func main() {
 
 		target := uint64(i * 1024)
 
-		ok, consumed, timeTaken := simulate(target)
+		ok, consumed, timeTaken := simulate(target, *unsafe)
 		if !ok {
 			continue
 		}

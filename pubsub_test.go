@@ -131,6 +131,15 @@ func TestPubSub(t *testing.T) {
 		t.Errorf("Expected to receive `%s`, got `%s`", DATA, publishedMessage.Data)
 	}
 
+	// -- disabled SAFETY lock
+	//
+	// From now on messages won't be copied
+	// just reference to be passed to all topic
+	// subscribers & this is FASTer
+	if !pubsub.AllowUnsafe() {
+		t.Errorf("Expected to disable SAFETY lock")
+	}
+
 	for i := 0; i < 8; i++ {
 
 		published, count = pubsub.Publish(&msg)
@@ -142,6 +151,11 @@ func TestPubSub(t *testing.T) {
 		}
 
 	}
+
+	if !pubsub.OnlySafe() {
+		t.Errorf("Expected to enable SAFETY lock")
+	}
+	// -- enabled SAFETY lock
 
 	published, count = pubsub.BPublish(&msg, time.Duration(1)*time.Millisecond)
 	if !published {
@@ -240,6 +254,10 @@ func TestPubSub(t *testing.T) {
 
 	published, _ = pubsub.Publish(&msg)
 	if published {
+		t.Errorf("Expected pub/sub system to be down")
+	}
+
+	if pubsub.OnlySafe() {
 		t.Errorf("Expected pub/sub system to be down")
 	}
 

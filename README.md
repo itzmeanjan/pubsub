@@ -24,19 +24,17 @@ Stress testing using `pubsub` was done for following message passing patterns, w
 
 > If you may be interested in taking a look at stress testing [examples](./stress)
 
-![spsc](./sc/spsc.png)
-
-![spmc](./sc/spmc.png)
-
-![mpsc](./sc/mpsc.png)
-
-![mpmc](./sc/mpmc.png)
+SPSC | SPMC | MPSC | MPMC
+--- | --- | --- | ---
+![spsc](./sc/spsc.png) | ![spmc](./sc/spmc.png) | ![mpsc](./sc/mpsc.png) | ![mpmc](./sc/mpmc.png)
 
 ---
 
 One generic simulation with **N** -parties & rolling average of data transferred is present [here](./stress/generic/main.go)
 
-![generic_simulation](./sc/generic.png)
+SAFETY Mode Enabled **( SLOWER )** | SAFETY Mode Disabled **( FASTER )**
+--- | ---
+![generic_safe_simulation](./sc/generic.png) | ![generic_unsafe_simulation](./sc/generic_unsafe.png)
 
 ---
 
@@ -70,7 +68,7 @@ And follow full [example](./example/main.go).
 
 A few things you should care about when using `pubsub` in your application
 
-- Though Go channels are heavily used in this package, you're never supposed to be interacting with them directly. Abstracted, easy to use methods are made available for you. **DON'T INTERACT WITH CHANNELS DIRECTLY**
+- Though Go channels are heavily used in this package, you're never supposed to be interacting with them directly. Abstracted, easy to use methods are made available for you. **DON'T INTERACT WITH CHANNELS DIRECTLY. IF YOU DO, PLEASE BE CAREFUL.**
 - When creating new subscriber, it'll be allocated with one unique **ID**. ID generation logic is very simple. **BUT MAKE SURE YOU NEVER MANIPULATE IT**
 
 ```js
@@ -78,6 +76,7 @@ last_id = 1 // initial value
 next_id = last_id + 1
 last_id = next_id
 ```
+
 - If you're a publisher, you should concern yourself with either of
     - `PubSub.Publish(...)` [ **non-blocking** ]
     - or `PubSub.BPublish(...)` [ **blocking** ]
@@ -94,6 +93,14 @@ last_id = next_id
 ```go
 broker := PubSub.New()
 ```
+
+- If you use `pubsub` with default settings you won't get highest possible HUB performance. You can enable that explicitly _( at your own risk )_ by invoking `PubSub.AllowUnsafe()`, which will stop doing most expensive thing it does during message passing i.e. **copying messages for each subscriber**. It'll make whole system FASTer, but at cost of risk.
+    
+> Let's assume you publish a message to N-parties & make modification to same message slice which you used for publishing. As you've also disabled safety lock, hub didn't copy messages for each subscriber, rather it just passed a reference to that same slice to all parties. Each of them might see an inconsistent view of message now. **If you're sure you're not making any changes to same message slice from either publisher/ subscriber side, you better disable SAFETY lock & get far better performance from Pub/Sub system.**
+
+- After disabling SAFETY lock, you might want to again enable it at runtime, which can be done in concurrent safe manner by invoking `PubSub.OnlySafe()`.
+
+**🔥 Disabling safety mode, brings you ~63.17% performance improvement, but be careful 🔥**
 
 **And all set 🚀**
 
