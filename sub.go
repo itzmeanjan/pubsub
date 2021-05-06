@@ -8,17 +8,14 @@ import (
 // Subscriber - Uniquely identifiable subscriber with multiple
 // subscribed topics from where it wishes to listen from over single channel
 type Subscriber struct {
-	Id             uint64
-	Reader         io.Reader
-	Writer         io.Writer
-	mLock          *sync.RWMutex
-	tLock          *sync.RWMutex
-	NewMessageChan chan *PublishedMessage
-	NextChan       chan chan *PublishedMessage
-	NewTopicChan   chan []string
-	Topics         map[string]bool
-	Buffer         []*PublishedMessage
-	Hub            *PubSub
+	Id     uint64
+	Reader io.Reader
+	Writer io.Writer
+	mLock  *sync.RWMutex
+	tLock  *sync.RWMutex
+	Topics map[string]bool
+	Buffer []*PublishedMessage
+	Hub    *PubSub
 }
 
 func (s *Subscriber) Start() {

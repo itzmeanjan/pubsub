@@ -3,7 +3,7 @@ package pubsub
 import (
 	"context"
 	"io"
-	"time"
+	"sync"
 )
 
 // PubSub - Pub/Sub Server i.e. holds which clients are subscribed to what topics,
@@ -191,55 +191,40 @@ func (p *PubSub) Start(ctx context.Context) {
 func (p *PubSub) Publish(msg *Message) (bool, uint64) {
 
 	if p.Alive {
-
 		resChan := make(chan uint64)
 		p.MessageChan <- &PublishRequest{Message: msg, ResponseChan: resChan}
 
 		return true, <-resChan
-
 	}
 
 	return false, 0
 
 }
 
-// BPublish - Publish message to N-many topics and block for at max `delay`
-// if any subscriber of any of those topics are not having enough buffer
-// space
-//
-// Please note, hub attempts to send message on subscriber channel
-// if finds lack of space, wait for `delay` & retries. This time too if it fails
-// to find enough space, it'll return back immediately.
-func (p *PubSub) BPublish(msg *Message, delay time.Duration) (bool, uint64) {
+func (p *PubSub) nextId() uint64 {
+	resChan := make(chan uint64)
+	p.SubscriberIdChan <- resChan
 
-	if p.Alive {
-		resChan := make(chan uint64)
-		p.MessageChan <- &PublishRequest{Message: msg, BlockFor: delay, ResponseChan: resChan}
-
-		return true, <-resChan
-	}
-
-	return false, 0
-
+	return <-resChan
 }
 
-// Subscribe_ - ...
-func (p *PubSub) Subscribe_(cap uint64, topics ...string) *Subscriber {
+func (p *PubSub) Subscribe(cap int, topics ...string) *Subscriber {
 
 	if p.Alive {
 		if len(topics) == 0 {
 			return nil
 		}
 
-		idGenChan := make(chan uint64)
-		p.SubscriberIdChan <- idGenChan
-
 		r, w := io.Pipe()
 		sub := &Subscriber{
-			Id:     <-idGenChan,
+			Id:     p.nextId(),
 			Reader: r,
 			Writer: w,
+			mLock:  &sync.RWMutex{},
+			tLock:  &sync.RWMutex{},
+			Buffer: make([]*PublishedMessage, 0, cap),
 			Topics: make(map[string]bool),
+			Hub:    p,
 		}
 
 		for i := 0; i < len(topics); i++ {
@@ -249,11 +234,10 @@ func (p *PubSub) Subscribe_(cap uint64, topics ...string) *Subscriber {
 		resChan := make(chan uint64)
 		p.SubscribeChan <- &SubscriptionRequest{
 			Id:           sub.Id,
-			Writer:       w,
+			Writer:       sub.Writer,
 			Topics:       topics,
 			ResponseChan: resChan,
 		}
-		// Intentionally being ignored
 		<-resChan
 
 		return sub
@@ -343,15 +327,12 @@ func (p *PubSub) Unsubscribe(subscriber *Subscriber, topics ...string) (bool, ui
 func (p *PubSub) UnsubscribeAll(subscriber *Subscriber) (bool, uint64) {
 
 	if p.Alive {
-
 		topics := make([]string, 0, len(subscriber.Topics))
 		for topic, ok := range subscriber.Topics {
-
 			if ok {
 				topics = append(topics, topic)
 				subscriber.Topics[topic] = false
 			}
-
 		}
 
 		if len(topics) == 0 {
@@ -366,7 +347,6 @@ func (p *PubSub) UnsubscribeAll(subscriber *Subscriber) (bool, uint64) {
 		}
 
 		return true, <-resChan
-
 	}
 
 	return false, 0
