@@ -259,108 +259,14 @@ func (p *PubSub) addSubscription(subReq *SubscriptionRequest) (bool, uint64) {
 	return false, 0
 }
 
-// AddSubscription - Use existing subscriber client to subscribe to more topics
-//
-// Response will only be negative if Pub/Sub system has stopped running
-func (p *PubSub) AddSubscription(subscriber *Subscriber, topics ...string) (bool, uint64) {
-
+func (p *PubSub) unsubscribe(unsubReq *UnsubscriptionRequest) (bool, uint64) {
 	if p.Alive {
-		if len(topics) == 0 {
-			return true, 0
-		}
-
-		for i := 0; i < len(topics); i++ {
-			if state, ok := subscriber.Topics[topics[i]]; ok && state {
-				continue
-			}
-
-			subscriber.Topics[topics[i]] = true
-		}
-
 		resChan := make(chan uint64)
-		p.SubscribeChan <- &SubscriptionRequest{
-			Id:           subscriber.Id,
-			Writer:       subscriber.Writer,
-			Topics:       topics,
-			ResponseChan: resChan,
-		}
-		return true, <-resChan
-	}
-
-	return false, 0
-
-}
-
-// Unsubscribe - Unsubscribes from topics for specified subscriber client
-//
-// Response will only be negative if Pub/Sub system has stopped running
-func (p *PubSub) Unsubscribe(subscriber *Subscriber, topics ...string) (bool, uint64) {
-
-	if p.Alive {
-
-		if len(topics) == 0 {
-			return true, 0
-		}
-
-		_topics := make([]string, 0, len(topics))
-		for i := 0; i < len(topics); i++ {
-
-			if state, ok := subscriber.Topics[topics[i]]; ok {
-				if state {
-					_topics = append(_topics, topics[i])
-					subscriber.Topics[topics[i]] = false
-				}
-			}
-
-		}
-
-		if len(_topics) == 0 {
-			return true, 0
-		}
-
-		resChan := make(chan uint64)
-		p.UnsubscribeChan <- &UnsubscriptionRequest{
-			Id:           subscriber.Id,
-			Topics:       _topics,
-			ResponseChan: resChan,
-		}
-
-		return true, <-resChan
-
-	}
-
-	return false, 0
-
-}
-
-// UnsubscribeAll - All current active subscriptions get unsubscribed from
-//
-// Response will only be negative if Pub/Sub system has stopped running
-func (p *PubSub) UnsubscribeAll(subscriber *Subscriber) (bool, uint64) {
-
-	if p.Alive {
-		topics := make([]string, 0, len(subscriber.Topics))
-		for topic, ok := range subscriber.Topics {
-			if ok {
-				topics = append(topics, topic)
-				subscriber.Topics[topic] = false
-			}
-		}
-
-		if len(topics) == 0 {
-			return true, 0
-		}
-
-		resChan := make(chan uint64)
-		p.UnsubscribeChan <- &UnsubscriptionRequest{
-			Id:           subscriber.Id,
-			Topics:       topics,
-			ResponseChan: resChan,
-		}
+		unsubReq.ResponseChan = resChan
+		p.UnsubscribeChan <- unsubReq
 
 		return true, <-resChan
 	}
 
 	return false, 0
-
 }

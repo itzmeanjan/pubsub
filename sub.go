@@ -50,6 +50,10 @@ func (s *Subscriber) Next() *PublishedMessage {
 }
 
 func (s *Subscriber) AddSubscription(topics ...string) (bool, uint64) {
+	for i := 0; i < len(topics); i++ {
+		s.Topics[topics[i]] = true
+	}
+
 	return s.hub.addSubscription(&SubscriptionRequest{
 		Id:     s.Id,
 		Writer: s.Writer,
@@ -57,14 +61,25 @@ func (s *Subscriber) AddSubscription(topics ...string) (bool, uint64) {
 	})
 }
 
-// Unsubscribe - Unsubscribe from topics, if subscribed to them using this client
-func (s *Subscriber) Unsubscribe(pubsub *PubSub, topics ...string) (bool, uint64) {
-	return pubsub.Unsubscribe(s, topics...)
+func (s *Subscriber) Unsubscribe(topics ...string) (bool, uint64) {
+	for i := 0; i < len(topics); i++ {
+		s.Topics[topics[i]] = false
+	}
+
+	return s.hub.unsubscribe(&UnsubscriptionRequest{
+		Id:     s.Id,
+		Topics: topics,
+	})
 }
 
-// UnsubcribeAll - Unsubscribes from all topics this client is currently subscribed to
-func (s *Subscriber) UnsubscribeAll(pubsub *PubSub) (bool, uint64) {
-	return pubsub.UnsubscribeAll(s)
+func (s *Subscriber) UnsubscribeAll() (bool, uint64) {
+	topics := make([]string, 0, len(s.Topics))
+
+	for k := range s.Topics {
+		topics = append(topics, k)
+	}
+
+	return s.Unsubscribe(topics...)
 }
 
 // Close - Destroys subscriber
