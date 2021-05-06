@@ -2,49 +2,25 @@ package pubsub
 
 import (
 	"io"
-	"time"
 )
 
 // Subscriber - Uniquely identifiable subscriber with multiple
 // subscribed topics from where it wishes to listen from over single channel
 type Subscriber struct {
-	Id      uint64
-	Channel chan *PublishedMessage
-	Reader  io.Reader
-	Writer  io.Writer
-	Topics  map[string]bool
+	Id     uint64
+	Reader io.Reader
+	Writer io.Writer
+	Topics map[string]bool
 }
 
-// Next_ - ...
-func (s *Subscriber) Next_() *PublishedMessage {
+// Next - ...
+func (s *Subscriber) Next() *PublishedMessage {
 	b := new(Binary)
 	if _, err := b.ReadFrom(s.Reader); err != nil {
 		return nil
 	}
 
 	return &PublishedMessage{Data: *b}
-}
-
-// Next - Read from channel if anything is immediately available
-// otherwise just return i.e. it's non-blocking op
-func (s *Subscriber) Next() *PublishedMessage {
-	if len(s.Channel) != 0 {
-		return <-s.Channel
-	}
-
-	return nil
-}
-
-// BNext - Read from channel, if something is available immediately
-// otherwise wait for specified delay & attempt to read again where
-// this step is non-blocking
-func (s *Subscriber) BNext(delay time.Duration) *PublishedMessage {
-	if data := s.Next(); data != nil {
-		return data
-	}
-
-	<-time.After(delay)
-	return s.Next()
 }
 
 // AddSubscription - Subscribe to topics using existing pub/sub client

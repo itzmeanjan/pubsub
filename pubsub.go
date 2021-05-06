@@ -17,11 +17,9 @@ type PubSub struct {
 	MessageChan      chan *PublishRequest
 	SubscriberIdChan chan chan uint64
 	SubscribeChan    chan *SubscriptionRequest
-	SubscribeChan_   chan *SubscriptionRequest_
 	UnsubscribeChan  chan *UnsubscriptionRequest
 	SafetyChan       chan *SafetyMode
-	Subscribers      map[string]map[uint64]chan *PublishedMessage
-	Subscribers_     map[string]map[uint64]io.Writer
+	Subscribers      map[string]map[uint64]io.Writer
 }
 
 // New - Create a new Pub/Sub hub, using which messages
@@ -36,7 +34,7 @@ func New() *PubSub {
 		SubscribeChan:    make(chan *SubscriptionRequest, 1),
 		UnsubscribeChan:  make(chan *UnsubscriptionRequest, 1),
 		SafetyChan:       make(chan *SafetyMode, 1),
-		Subscribers:      make(map[string]map[uint64]chan *PublishedMessage),
+		Subscribers:      make(map[string]map[uint64]io.Writer),
 	}
 }
 
@@ -108,19 +106,16 @@ func (p *PubSub) Start(ctx context.Context) {
 
 			for i := 0; i < len(req.Message.Topics); i++ {
 				topic := req.Message.Topics[i]
-				subs, ok := p.Subscribers_[topic]
-				if !ok {
-					continue
-				}
+				if subs, ok := p.Subscribers[topic]; ok {
+					for _, w := range subs {
+						if _, ok := _writers[w]; ok {
+							continue
+						}
 
-				for _, w := range subs {
-					if _, ok := _writers[w]; ok {
-						continue
+						writers = append(writers, w)
+						_writers[w] = true
+						publishedOn++
 					}
-
-					writers = append(writers, w)
-					_writers[w] = true
-					publishedOn++
 				}
 			}
 
@@ -139,37 +134,12 @@ func (p *PubSub) Start(ctx context.Context) {
 
 			var subscribedTo uint64
 
-			for topic := range req.Subscriber.Topics {
-
-				subs, ok := p.Subscribers[topic]
-				if !ok {
-
-					p.Subscribers[topic] = make(map[uint64]chan *PublishedMessage)
-					p.Subscribers[topic][req.Subscriber.Id] = req.Subscriber.Channel
-					subscribedTo++
-
-					continue
-				}
-
-				if _, ok := subs[req.Subscriber.Id]; !ok {
-					subs[req.Subscriber.Id] = req.Subscriber.Channel
-					subscribedTo++
-				}
-
-			}
-
-			req.ResponseChan <- subscribedTo
-
-		case req := <-p.SubscribeChan_:
-
-			var subscribedTo uint64
-
 			for i := 0; i < len(req.Topics); i++ {
 				topic := req.Topics[i]
-				subs, ok := p.Subscribers_[topic]
+				subs, ok := p.Subscribers[topic]
 				if !ok {
-					p.Subscribers_[topic] = make(map[uint64]io.Writer)
-					p.Subscribers_[topic][req.Id] = req.Writer
+					p.Subscribers[topic] = make(map[uint64]io.Writer)
+					p.Subscribers[topic][req.Id] = req.Writer
 					subscribedTo++
 
 					continue
@@ -189,14 +159,14 @@ func (p *PubSub) Start(ctx context.Context) {
 
 			for i := 0; i < len(req.Topics); i++ {
 				topic := req.Topics[i]
-				if subs, ok := p.Subscribers_[topic]; ok {
+				if subs, ok := p.Subscribers[topic]; ok {
 					if _, ok := subs[req.Id]; ok {
 						delete(subs, req.Id)
 						unsubscribedFrom++
 					}
 
 					if len(subs) == 0 {
-						delete(p.Subscribers_, topic)
+						delete(p.Subscribers, topic)
 					}
 				}
 			}
@@ -277,7 +247,7 @@ func (p *PubSub) Subscribe_(cap uint64, topics ...string) *Subscriber {
 		}
 
 		resChan := make(chan uint64)
-		p.SubscribeChan_ <- &SubscriptionRequest_{
+		p.SubscribeChan <- &SubscriptionRequest{
 			Id:           sub.Id,
 			Writer:       w,
 			Topics:       topics,
@@ -312,7 +282,7 @@ func (p *PubSub) AddSubscription(subscriber *Subscriber, topics ...string) (bool
 		}
 
 		resChan := make(chan uint64)
-		p.SubscribeChan_ <- &SubscriptionRequest_{
+		p.SubscribeChan <- &SubscriptionRequest{
 			Id:           subscriber.Id,
 			Writer:       subscriber.Writer,
 			Topics:       topics,

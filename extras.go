@@ -25,18 +25,11 @@ type PublishedMessage struct {
 	Data  Binary
 }
 
-// SubscriptionRequest_ - ...
-type SubscriptionRequest_ struct {
+// SubscriptionRequest - ...
+type SubscriptionRequest struct {
 	Id           uint64
 	Writer       io.Writer
 	Topics       []string
-	ResponseChan chan uint64
-}
-
-// SubscriptionRequest - Subscriber to send topic subscription request in this form,
-// will also receive how many topics were successfully subscribed to
-type SubscriptionRequest struct {
-	Subscriber   *Subscriber
 	ResponseChan chan uint64
 }
 
