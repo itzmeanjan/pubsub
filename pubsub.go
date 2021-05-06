@@ -103,76 +103,30 @@ func (p *PubSub) Start(ctx context.Context) {
 		case req := <-p.MessageChan:
 
 			var publishedOn uint64
+			var writers = make([]io.Writer, 0, 1)
 
 			for i := 0; i < len(req.Message.Topics); i++ {
-
 				topic := req.Message.Topics[i]
-				subs, ok := p.Subscribers[topic]
+				subs, ok := p.Subscribers_[topic]
 				if !ok {
 					continue
 				}
 
-				for _, sub := range subs {
-
-					// For blocking publish requests
-					// wait for X duration at max & retry
-					// if failing again, don't block this time
-					if !(len(sub) < cap(sub)) {
-						<-time.After(req.BlockFor)
-					}
-
-					// Checking whether receiver channel has enough buffer space
-					// to hold this message or not
-					if len(sub) < cap(sub) {
-
-						// Only when user has explicitly disabled
-						// SAFETY lock, just passing message reference
-						// to all subscribers, without copying from original
-						if !p.SafetyMode {
-							msg := PublishedMessage{
-								Data:  req.Message.Data,
-								Topic: topic,
-							}
-
-							sub <- &msg
-							publishedOn++
-
-							continue
-						}
-
-						// As byte slices are reference types i.e. if we
-						// just pass it over channel to subscribers & either
-						// of publishers/ subscribers make any modification
-						// to that slice, it'll be reflected for all parties involved
-						//
-						// So it's better to give everyone their exclusive copy, when
-						// SAFETY mode is enabled, which HUB enables by default
-						// for you
-						copied := make([]byte, len(req.Message.Data))
-						n := copy(copied, req.Message.Data)
-						if n != len(req.Message.Data) {
-							continue
-						}
-
-						msg := PublishedMessage{
-							Data:  copied,
-							Topic: topic,
-						}
-
-						sub <- &msg
-						publishedOn++
-					}
-
+				for _, w := range subs {
+					writers = append(writers, w)
+					publishedOn++
 				}
-
 			}
 
+			if publishedOn != 0 {
+				w := io.MultiWriter(writers...)
+				req.Message.Data.WriteTo(w)
+			}
 			req.ResponseChan <- publishedOn
 
 		case req := <-p.SubscriberIdChan:
 
 			req <- p.Index
-			// Next subscriber identifier, always monotonically incremented
 			p.Index++
 
 		case req := <-p.SubscribeChan:
