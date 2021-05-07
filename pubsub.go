@@ -176,7 +176,7 @@ func (p *PubSub) Subscribe(ctx context.Context, cap int, topics ...string) *Subs
 		}
 
 		started := make(chan struct{})
-		go sub.Start(ctx, started)
+		go sub.start(ctx, started)
 		<-resChan
 		<-started
 
