@@ -3,11 +3,11 @@ Embeddable Lightweight Pub/Sub in Go
 
 ## Motivation
 
-After using several Pub/Sub systems in writing production grade softwares for sometime, I decided to write one very simple, embeddable, light-weight Pub/Sub system using only native Go functionalities i.e. Go routines, Go channels.
+After using several Pub/Sub systems in writing production grade softwares for sometime, I decided to write one very simple, embeddable, light-weight Pub/Sub system using only native Go functionalities i.e. Go routines, Go channels, Streaming I/O.
 
 Actually, Go channels are **MPSC** i.e. multiple producers can push onto same channel, but there's only one consumer. You're very much free to use multiple consumers on single channel, but they will start competing for messages being published on channel i.e. all consumers won't see all messages published on channel.
 
-Good thing is that Go channels are concurrent-safe. So I considered extending it to make in-application communication more flexible. Below is what provided by this embeddable piece of software.
+Good thing is that Go channels are concurrent-safe. So I considered extending it to make in-application communication more flexible, while leveraging Go's powerful streaming I/O for fast copying of messages from publisher stream to N-consumer stream(s). Below is what provided by this embeddable piece of software.
 
 ✌️ | Producer | Consumer
 --- | --: | --:
@@ -20,23 +20,18 @@ Multiple | ✅ | ✅
 
 ## Stress Testing
 
-Stress testing using `pubsub` was done for following message passing patterns, where every message was of size **1024 bytes** & I attempted to calculate time spent for producing & consuming data under various configuration.
+For stress testing the system, I wrote one generic [program](./stress) which makes running tests very configurable using CLI argument combinations.
 
-> If you may be interested in taking a look at stress testing [examples](./stress)
+Run it using with
+
+```bash
+go run stress/main.go -help
+go run stress/main.go
+```
 
 SPSC | SPMC | MPSC | MPMC
 --- | --- | --- | ---
 ![spsc](./sc/spsc.png) | ![spmc](./sc/spmc.png) | ![mpsc](./sc/mpsc.png) | ![mpmc](./sc/mpmc.png)
-
----
-
-One generic simulation with **N** -parties & rolling average of data transferred is present [here](./stress/generic/main.go)
-
-SAFETY Mode Enabled **( SLOWER )** | SAFETY Mode Disabled **( FASTER )**
---- | ---
-![generic_safe_simulation](./sc/generic.png) | ![generic_unsafe_simulation](./sc/generic_unsafe.png)
-
----
 
 ## Usage
 
@@ -57,7 +52,7 @@ touch main.go
 Now add `github.com/itzmeanjan/pubsub` as your project dependency
 
 ```bash
-go get github.com/itzmeanjan/pubsub # v0.1.1 latest
+go get github.com/itzmeanjan/pubsub # v0.1.4 latest
 ```
 
 And follow full [example](./example/main.go).
