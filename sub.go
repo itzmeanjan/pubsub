@@ -117,7 +117,7 @@ func (s *Subscriber) start(ctx context.Context, started chan struct{}) {
 			}
 
 			s.mLock.Lock()
-			s.buffer = append(s.buffer, &PublishedMessage{Topic: t.String(), Data: *b})
+			s.buffer = append(s.buffer, &PublishedMessage{Topic: *t, Data: *b})
 			s.mLock.Unlock()
 
 		}
