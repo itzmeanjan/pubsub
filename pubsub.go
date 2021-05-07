@@ -142,14 +142,15 @@ func (p *PubSub) start(ctx context.Context, started chan struct{}) {
 					if len(writers) != 0 {
 						w := io.MultiWriter(writers...)
 
-						if _, err := (String(topic)).WriteTo(w); err != nil {
+						msg := PublishedMessage{
+							Topic: topic,
+							Data:  req.Message.Data,
+						}
+						if _, err := msg.WriteTo(w); err != nil {
 							log.Printf("[pubsub] Error : %s\n", err.Error())
 							continue
 						}
-						if _, err := req.Message.Data.WriteTo(w); err != nil {
-							log.Printf("[pubsub] Error : %s\n", err.Error())
-							continue
-						}
+
 					}
 				}
 			}

@@ -100,27 +100,20 @@ func (s *Subscriber) start(ctx context.Context, started chan struct{}) {
 	close(started)
 
 	for {
-
 		select {
 		case <-ctx.Done():
 			return
 
 		case <-s.info.Ping:
-			t := new(String)
-			if _, err := t.ReadFrom(s.reader); err != nil {
-				continue
-			}
-
-			b := new(Binary)
-			if _, err := b.ReadFrom(s.reader); err != nil {
+			msg := new(PublishedMessage)
+			if _, err := msg.ReadFrom(s.reader); err != nil {
 				continue
 			}
 
 			s.mLock.Lock()
-			s.buffer = append(s.buffer, &PublishedMessage{Topic: *t, Data: *b})
+			s.buffer = append(s.buffer, msg)
 			s.mLock.Unlock()
 
 		}
-
 	}
 }
