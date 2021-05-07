@@ -40,7 +40,70 @@ func New(ctx context.Context) *PubSub {
 	return broker
 }
 
-// Start - Handles request from publishers & subscribers, so that
+// Publish - Send message publishing request to N-topics in concurrent-safe manner
+func (p *PubSub) Publish(msg *Message) (bool, uint64) {
+	if p.Alive {
+		resChan := make(chan uint64)
+		p.messageChan <- &PublishRequest{Message: msg, ResponseChan: resChan}
+
+		return true, <-resChan
+	}
+
+	return false, 0
+}
+
+// Subscribe - Create new subscriber instance with initial buffer capacity,
+// listening for messages published on N-topics initially.
+//
+// More topics can be subscribed to later using returned subscriber instance.
+func (p *PubSub) Subscribe(ctx context.Context, cap int, topics ...string) *Subscriber {
+	if p.Alive {
+		if len(topics) == 0 {
+			return nil
+		}
+		ok, id := p.nextId()
+		if !ok {
+			return nil
+		}
+		r, w := io.Pipe()
+
+		sub := &Subscriber{
+			id:     id,
+			reader: r,
+			writer: w,
+			ping:   make(chan struct{}, 1),
+			mLock:  &sync.RWMutex{},
+			tLock:  &sync.RWMutex{},
+			topics: make(map[string]bool),
+			buffer: make([]*PublishedMessage, 0, cap),
+			hub:    p,
+		}
+
+		for i := 0; i < len(topics); i++ {
+			sub.topics[topics[i]] = true
+		}
+
+		resChan := make(chan uint64)
+		p.subscribeChan <- &SubscriptionRequest{
+			Id:           sub.id,
+			Ping:         sub.ping,
+			Writer:       sub.writer,
+			Topics:       topics,
+			ResponseChan: resChan,
+		}
+
+		started := make(chan struct{})
+		go sub.start(ctx, started)
+		<-resChan
+		<-started
+
+		return sub
+	}
+
+	return nil
+}
+
+// start - Handles request from publishers & subscribers, so that
 // message publishing can be abstracted
 //
 // Consider running it as a go routine
@@ -133,64 +196,6 @@ func (p *PubSub) start(ctx context.Context, started chan struct{}) {
 		}
 	}
 
-}
-
-func (p *PubSub) Publish(msg *Message) (bool, uint64) {
-	if p.Alive {
-		resChan := make(chan uint64)
-		p.messageChan <- &PublishRequest{Message: msg, ResponseChan: resChan}
-
-		return true, <-resChan
-	}
-
-	return false, 0
-}
-
-func (p *PubSub) Subscribe(ctx context.Context, cap int, topics ...string) *Subscriber {
-	if p.Alive {
-		if len(topics) == 0 {
-			return nil
-		}
-		ok, id := p.nextId()
-		if !ok {
-			return nil
-		}
-		r, w := io.Pipe()
-
-		sub := &Subscriber{
-			id:     id,
-			reader: r,
-			writer: w,
-			ping:   make(chan struct{}, 1),
-			mLock:  &sync.RWMutex{},
-			tLock:  &sync.RWMutex{},
-			topics: make(map[string]bool),
-			buffer: make([]*PublishedMessage, 0, cap),
-			hub:    p,
-		}
-
-		for i := 0; i < len(topics); i++ {
-			sub.topics[topics[i]] = true
-		}
-
-		resChan := make(chan uint64)
-		p.subscribeChan <- &SubscriptionRequest{
-			Id:           sub.id,
-			Ping:         sub.ping,
-			Writer:       sub.writer,
-			Topics:       topics,
-			ResponseChan: resChan,
-		}
-
-		started := make(chan struct{})
-		go sub.start(ctx, started)
-		<-resChan
-		<-started
-
-		return sub
-	}
-
-	return nil
 }
 
 func (p *PubSub) nextId() (bool, uint64) {
