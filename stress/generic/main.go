@@ -35,30 +35,18 @@ func generateTopics(count int) []string {
 	return topics
 }
 
-func simulate(ctx context.Context, rollAfter time.Duration, parties uint64, unsafe bool) {
+func simulate(ctx context.Context, producers int, consumers int, topics int, rollAfter time.Duration, chunkSize datasize.ByteSize) {
 
 	broker := pubsub.New()
 	go broker.Start(ctx)
-	topics := generateTopics(int(parties))
+	_topics := generateTopics(topics)
 
 	<-time.After(time.Duration(100) * time.Microsecond)
 
-	// This will make things FASTer, but might
-	// not be always a good idea
-	//
-	// Atleast if you're going to modify same slice
-	// which you used for sending one message
-	// it'll be reflected at every subscriber's side
-	//
-	// Caution : Use with care
-	if unsafe {
-		broker.AllowUnsafe()
-	}
+	subscribers := make([]*pubsub.Subscriber, 0, consumers)
+	for i := 0; i < consumers; i++ {
 
-	subscribers := make([]*pubsub.Subscriber, 0, parties)
-	for i := 0; i < int(parties); i++ {
-
-		subscriber := broker.Subscribe(1024, topics...)
+		subscriber := broker.Subscribe(ctx, 16, _topics...)
 		if subscriber == nil {
 			return
 		}
@@ -66,14 +54,14 @@ func simulate(ctx context.Context, rollAfter time.Duration, parties uint64, unsa
 
 	}
 
-	for i := 0; i < int(parties); i++ {
+	for i := 0; i < producers; i++ {
 		go func(i int) {
 
 			var published uint64
 			var startedAt = time.Now()
 			msg := pubsub.Message{
-				Topics: topics,
-				Data:   getRandomByteSlice(1024),
+				Topics: _topics,
+				Data:   getRandomByteSlice(int(chunkSize)),
 			}
 
 			for {
@@ -124,17 +112,25 @@ func simulate(ctx context.Context, rollAfter time.Duration, parties uint64, unsa
 func main() {
 
 	var rollAfter = flag.Duration("rollAfter", time.Duration(4)*time.Second, "calculate performance & roll to zero, after duration")
-	var parties = flag.Uint64("parties", 2, "#-of producers, consumers & topics involved in simulation")
-	var unsafe = flag.Bool("unsafe", false, "avoid copying messages for each subcriber i.e. FASTer")
+	var producer = flag.Uint64("producer", 2, "#-of producers involved in simulation")
+	var consumer = flag.Uint64("consumer", 2, "#-of consumers involved in simulation")
+	var topic = flag.Uint64("topic", 2, "#-of topics involved in simulation")
+	var chunk = flag.String("chunk", "1 MB", "published message size")
 	flag.Parse()
+
+	var _chunk datasize.ByteSize
+	if err := _chunk.UnmarshalText([]byte(*chunk)); err != nil {
+		log.Printf("Error : %s\n", err.Error())
+		_chunk = datasize.MB
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 
 	interruptChan := make(chan os.Signal, 1)
 	signal.Notify(interruptChan, syscall.SIGTERM, syscall.SIGINT)
 
-	log.Printf("Pub/Sub Simulation with %d Producers, Consumers & Topics\n", *parties)
-	simulate(ctx, *rollAfter, *parties, *unsafe)
+	log.Printf("Pub/Sub Simulation with %d producers, %d consumers, %d topics & %s chunk size\n", *producer, *consumer, *topic, _chunk.HR())
+	simulate(ctx, int(*producer), int(*consumer), int(*topic), *rollAfter, _chunk)
 
 	<-interruptChan
 	cancel()
