@@ -11,8 +11,7 @@ import (
 type Subscriber struct {
 	id     uint64
 	reader io.Reader
-	writer io.Writer
-	ping   chan struct{}
+	info   *subscriberInfo
 	mLock  *sync.RWMutex
 	tLock  *sync.RWMutex
 	topics map[string]bool
@@ -53,10 +52,9 @@ func (s *Subscriber) AddSubscription(topics ...string) (bool, uint64) {
 		s.topics[topics[i]] = true
 	}
 
-	return s.hub.addSubscription(&SubscriptionRequest{
+	return s.hub.addSubscription(&subscriptionRequest{
 		Id:     s.id,
-		Ping:   s.ping,
-		Writer: s.writer,
+		info:   s.info,
 		Topics: topics,
 	})
 }
@@ -74,7 +72,7 @@ func (s *Subscriber) Unsubscribe(topics ...string) (bool, uint64) {
 		s.topics[topics[i]] = false
 	}
 
-	return s.hub.unsubscribe(&UnsubscriptionRequest{
+	return s.hub.unsubscribe(&unsubscriptionRequest{
 		Id:     s.id,
 		Topics: topics,
 	})
@@ -107,7 +105,7 @@ func (s *Subscriber) start(ctx context.Context, started chan struct{}) {
 		case <-ctx.Done():
 			return
 
-		case <-s.ping:
+		case <-s.info.Ping:
 			t := new(String)
 			if _, err := t.ReadFrom(s.reader); err != nil {
 				continue
