@@ -16,7 +16,7 @@ Multiple | ✅ | ✅
 
 ## Design
 
-![architecture](./sc/architecture.jpg)
+![architecture](./sc/architecture.png)
 
 ## Stress Testing
 
@@ -73,7 +73,7 @@ broker := pubsub.New(ctx)
 
 ```go
 msg := pubsub.Message{
-    Topics: []string{"topic_1"},
+    Topics: []pubsub.String{pubsub.String("topic_1")},
     Data:   []byte("hello"),
 }
 ok, publishedTo := broker.Publish(&msg) // concurrent-safe
