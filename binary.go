@@ -11,6 +11,10 @@ func (b Binary) Bytes() []byte {
 	return b
 }
 
+func (b Binary) String() string {
+	return string(b)
+}
+
 func (b Binary) WriteTo(w io.Writer) (int64, error) {
 	if err := binary.Write(w, binary.BigEndian, uint32(len(b))); err != nil {
 		return 0, err
