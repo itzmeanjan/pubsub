@@ -125,6 +125,7 @@ func (p *PubSub) start(ctx context.Context, started chan struct{}) {
 
 		case req := <-p.messageChan:
 			var publishedOn uint64
+			var msg = &PublishedMessage{Data: req.Message.Data}
 
 			for i := 0; i < len(req.Message.Topics); i++ {
 				topic := req.Message.Topics[i]
@@ -142,15 +143,11 @@ func (p *PubSub) start(ctx context.Context, started chan struct{}) {
 					if len(writers) != 0 {
 						w := io.MultiWriter(writers...)
 
-						msg := PublishedMessage{
-							Topic: topic,
-							Data:  req.Message.Data,
-						}
+						msg.Topic = topic
 						if _, err := msg.WriteTo(w); err != nil {
 							log.Printf("[pubsub] Error : %s\n", err.Error())
 							continue
 						}
-
 					}
 				}
 			}
