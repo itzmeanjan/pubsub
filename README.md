@@ -20,7 +20,7 @@ Multiple | ✅ | ✅
 
 ## Stress Testing
 
-For stress testing the system, I wrote one generic [program](./stress) which makes running tests very configurable using CLI argument combinations.
+For stress testing the system, I wrote one configurable [program](./stress) which makes running tests easy using various CLI argument combination.
 
 Run it using with
 
@@ -29,9 +29,7 @@ go run stress/main.go -help
 go run stress/main.go
 ```
 
-SPSC | SPMC | MPSC | MPMC
---- | --- | --- | ---
-![spsc](./sc/spsc.png) | ![spmc](./sc/spmc.png) | ![mpsc](./sc/mpsc.png) | ![mpmc](./sc/mpmc.png)
+![stress_testing_result](./sc/result.jpg)
 
 ## Usage
 
