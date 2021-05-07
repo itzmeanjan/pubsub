@@ -43,7 +43,7 @@ func generateTopics(count int) []pubsub.String {
 }
 
 func _stringTopics(topics []pubsub.String) []string {
-	_topics := make([]string, 0, len(topics))
+	_topics := make([]string, len(topics))
 
 	for i := 0; i < len(topics); i++ {
 		_topics[i] = topics[i].String()
