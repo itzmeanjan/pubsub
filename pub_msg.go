@@ -7,7 +7,7 @@ import (
 
 // Message - Publisher showing intent of publishing arbitrary byte slice to topics
 type Message struct {
-	Topics []string
+	Topics []String
 	Data   Binary
 }
 
@@ -23,7 +23,7 @@ func (m *Message) WriteTo(w io.Writer) (int64, error) {
 
 	for i := 0; i < len(m.Topics); i++ {
 
-		if _n, err := String(m.Topics[i]).WriteTo(w); err != nil {
+		if _n, err := m.Topics[i].WriteTo(w); err != nil {
 			return n, err
 		} else {
 			n += _n
@@ -51,7 +51,7 @@ func (m *Message) ReadFrom(r io.Reader) (int64, error) {
 
 	n += 2
 
-	buf := make([]string, 0, size)
+	buf := make([]String, 0, size)
 	for i := 0; i < int(size); i++ {
 
 		t := new(String)
@@ -59,7 +59,7 @@ func (m *Message) ReadFrom(r io.Reader) (int64, error) {
 			return n, err
 		} else {
 			n += _n
-			buf = append(buf, t.String())
+			buf = append(buf, *t)
 		}
 
 	}

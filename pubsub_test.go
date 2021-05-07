@@ -3,7 +3,6 @@ package pubsub
 import (
 	"bytes"
 	"context"
-	"strings"
 	"testing"
 	"time"
 )
@@ -11,11 +10,11 @@ import (
 func TestPubSub(t *testing.T) {
 
 	var (
-		TOPIC_1  = "topic_1"
-		TOPIC_2  = "topic_2"
+		TOPIC_1  = String("topic_1")
+		TOPIC_2  = String("topic_2")
 		DATA     = []byte("hello")
-		TOPICS_1 = []string{TOPIC_1}
-		TOPICS_2 = []string{TOPIC_1, TOPIC_2}
+		TOPICS_1 = []String{TOPIC_1}
+		TOPICS_2 = []String{TOPIC_1, TOPIC_2}
 		DURATION = time.Duration(1) * time.Millisecond
 		msg      = Message{Topics: TOPICS_1, Data: DATA}
 	)
@@ -35,7 +34,7 @@ func TestPubSub(t *testing.T) {
 		t.Errorf("Expected no creation of subscriber")
 	}
 
-	subscriber := pubsub.Subscribe(ctx, 16, TOPIC_1)
+	subscriber := pubsub.Subscribe(ctx, 16, TOPIC_1.String())
 	if subscriber == nil && subscriber.id != 1 {
 		t.Errorf("Expected creation of subscriber")
 	}
@@ -60,7 +59,7 @@ func TestPubSub(t *testing.T) {
 		t.Errorf("Expected to subscribe to 0 new topic, got %d", count)
 	}
 
-	if _, count := subscriber.AddSubscription(TOPICS_2...); count != 1 {
+	if _, count := subscriber.AddSubscription(TOPICS_2[0].String(), TOPICS_2[1].String()); count != 1 {
 		t.Errorf("Expected to subscribe to 1 new topic, got %d", count)
 	}
 
@@ -82,11 +81,11 @@ func TestPubSub(t *testing.T) {
 
 	for i := 0; i < 8; i++ {
 
-		if publishedMessage := subscriber.Next(); publishedMessage == nil || strings.Compare(publishedMessage.Topic, TOPIC_1) != 0 || !bytes.Equal(publishedMessage.Data, DATA) {
+		if publishedMessage := subscriber.Next(); publishedMessage == nil || !bytes.Equal(publishedMessage.Topic.Bytes(), TOPIC_1.Bytes()) || !bytes.Equal(publishedMessage.Data, DATA) {
 			t.Errorf("Expected to receive `%s` from `%s`, got `%s` from `%s`", DATA, TOPIC_1, publishedMessage.Data, publishedMessage.Topic)
 		}
 
-		if publishedMessage := subscriber.Next(); publishedMessage == nil || strings.Compare(publishedMessage.Topic, TOPIC_2) != 0 || !bytes.Equal(publishedMessage.Data, DATA) {
+		if publishedMessage := subscriber.Next(); publishedMessage == nil || !bytes.Equal(publishedMessage.Topic.Bytes(), TOPIC_2.Bytes()) || !bytes.Equal(publishedMessage.Data, DATA) {
 			t.Errorf("Expected to receive `%s` from `%s`, got `%s` from `%s`", DATA, TOPIC_2, publishedMessage.Data, publishedMessage.Topic)
 		}
 
@@ -96,7 +95,7 @@ func TestPubSub(t *testing.T) {
 		t.Errorf("Expected to unsubscribe from 0 topic, got %d", count)
 	}
 
-	if _, count := subscriber.Unsubscribe(TOPIC_1); count != 1 {
+	if _, count := subscriber.Unsubscribe(TOPIC_1.String()); count != 1 {
 		t.Errorf("Expected to unsubscribe from 1 topic, got %d", count)
 	}
 
@@ -104,7 +103,7 @@ func TestPubSub(t *testing.T) {
 		t.Errorf("Expected to unsubscribe from 1 topic, got %d", count)
 	}
 
-	if _, count := subscriber.Unsubscribe(TOPICS_2...); count != 0 {
+	if _, count := subscriber.Unsubscribe(TOPICS_2[0].String(), TOPICS_2[1].String()); count != 0 {
 		t.Errorf("Expected to unsubscribe from 0 topic, got %d", count)
 	}
 

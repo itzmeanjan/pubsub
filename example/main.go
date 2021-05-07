@@ -15,9 +15,6 @@ func main() {
 	defer cancel()
 	// -- Starting pub/sub system
 
-	// Just waiting little while to give pub/sub broker enough time to get up & running
-	<-time.After(time.Duration(100) * time.Microsecond)
-
 	subscriber := broker.Subscribe(ctx, 16, "topic_1", "topic_2")
 	if subscriber == nil {
 		log.Printf("Failed to subscribe to topics\n")
@@ -29,7 +26,14 @@ func main() {
 	//
 	// During publishing if some topic doesn't have certain subscriber, it won't receive
 	// message later when it joins
-	msg := pubsub.Message{Topics: []string{"topic_1", "topic_2", "topic_3"}, Data: []byte("hello")}
+	msg := pubsub.Message{
+		Topics: []pubsub.String{
+			pubsub.String("topic_1"),
+			pubsub.String("topic_2"),
+			pubsub.String("topic_3"),
+		},
+		Data: []byte("hello"),
+	}
 	published, on := broker.Publish(&msg)
 	if !published {
 		log.Printf("Failed to publish message to topics\n")

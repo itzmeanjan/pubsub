@@ -129,7 +129,7 @@ func (p *PubSub) start(ctx context.Context, started chan struct{}) {
 			for i := 0; i < len(req.Message.Topics); i++ {
 				topic := req.Message.Topics[i]
 
-				if subs, ok := p.subscribers[topic]; ok {
+				if subs, ok := p.subscribers[topic.String()]; ok {
 					writers := make([]io.Writer, 0, 1)
 
 					for _, w := range subs {
