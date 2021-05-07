@@ -2,10 +2,11 @@ package main
 
 import (
 	"context"
+	crand "crypto/rand"
 	"flag"
 	"fmt"
 	"log"
-	"math/rand"
+	mrand "math/rand"
 	"os"
 	"os/signal"
 	"syscall"
@@ -19,8 +20,13 @@ import (
 func getRandomByteSlice(len int) []byte {
 	buffer := make([]byte, len)
 
+	n, err := crand.Read(buffer)
+	if err != nil && n == len {
+		return buffer
+	}
+
 	for i := 0; i < len; i++ {
-		buffer[i] = byte(rand.Intn(256))
+		buffer[i] = byte(mrand.Intn(256))
 	}
 
 	return buffer
