@@ -9,7 +9,7 @@ import (
 // PubSub - Pub/Sub Server i.e. holds which clients are subscribed to what topics,
 // manages publishing messages to correct topics, handles (un-)subscription requests
 //
-// In other words state manager of Pub/Sub system
+// In other words state manager of Pub/Sub Broker
 type PubSub struct {
 	Alive            bool
 	index            uint64
@@ -22,8 +22,8 @@ type PubSub struct {
 
 // New - Create a new Pub/Sub hub, using which messages
 // can be routed to various topics
-func New() *PubSub {
-	return &PubSub{
+func New(ctx context.Context) *PubSub {
+	broker := &PubSub{
 		Alive:            false,
 		index:            1,
 		messageChan:      make(chan *PublishRequest, 1),
@@ -32,17 +32,24 @@ func New() *PubSub {
 		unsubscribeChan:  make(chan *UnsubscriptionRequest, 1),
 		subscribers:      make(map[string]map[uint64]*SubscriberInfo),
 	}
+
+	started := make(chan struct{})
+	go broker.start(ctx, started)
+	<-started
+
+	return broker
 }
 
 // Start - Handles request from publishers & subscribers, so that
 // message publishing can be abstracted
 //
 // Consider running it as a go routine
-func (p *PubSub) Start(ctx context.Context) {
+func (p *PubSub) start(ctx context.Context, started chan struct{}) {
 
 	// Because pub/sub system is now running
 	// & it's ready to process requests
 	p.Alive = true
+	close(started)
 
 	for {
 		select {

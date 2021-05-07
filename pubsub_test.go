@@ -20,19 +20,9 @@ func TestPubSub(t *testing.T) {
 		msg      = Message{Topics: TOPICS_1, Data: DATA}
 	)
 
-	pubsub := New()
-	if pubsub.Alive {
-		t.Errorf("Expected Pub/Sub system to be dead")
-	}
-
-	if published, count := pubsub.Publish(&msg); published || count != 0 {
-		t.Errorf("Expected unability of publishing message")
-	}
-
 	ctx, cancel := context.WithCancel(context.Background())
+	pubsub := New(ctx)
 
-	go pubsub.Start(ctx)
-	<-time.After(DURATION)
 	if !pubsub.Alive {
 		t.Errorf("Expected Pub/Sub system to be alive")
 	}

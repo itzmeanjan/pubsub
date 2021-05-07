@@ -38,8 +38,7 @@ func generateTopics(count int) []string {
 
 func simulate(ctx context.Context, producers int, consumers int, topics int, rollAfter time.Duration, chunkSize datasize.ByteSize) {
 
-	broker := pubsub.New()
-	go broker.Start(ctx)
+	broker := pubsub.New(ctx)
 	_topics := generateTopics(topics)
 
 	<-time.After(time.Duration(100) * time.Microsecond)

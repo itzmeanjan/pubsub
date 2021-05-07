@@ -66,10 +66,8 @@ If you're planning to use `pubsub` in your application
 - You should first start pub/sub broker using
 
 ```go
-broker := PubSub.New()
-go broker.Start(ctx)
+broker := pubsub.New(ctx)
 
-<-time.After(time.Duration(100) * time.Microsecond)
 // Start using broker 👇
 ```
 
