@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/c2h5oh/datasize"
+	"github.com/gookit/color"
 	"github.com/itzmeanjan/pubsub"
 )
 
@@ -72,7 +73,7 @@ func simulate(ctx context.Context, producers int, consumers int, topics int, rol
 				published += uint64(len(msg.Data))
 
 				if time.Since(startedAt) >= rollAfter {
-					log.Printf("[P%d: ] at %s/s", i, (datasize.B * datasize.ByteSize(published/uint64(rollAfter/time.Second))).HR())
+					log.Println(color.Blue.Sprintf("[P%d: ] at %s/s", i, (datasize.B * datasize.ByteSize(published/uint64(rollAfter/time.Second))).HR()))
 
 					published = 0
 					startedAt = time.Now()
@@ -97,7 +98,7 @@ func simulate(ctx context.Context, producers int, consumers int, topics int, rol
 				consumed += uint64(len(msg.Data))
 
 				if time.Since(startedAt) >= rollAfter {
-					log.Printf("[C%d: ] at %s/s", i, (datasize.B * datasize.ByteSize(consumed/uint64(rollAfter/time.Second))).HR())
+					log.Println(color.Green.Sprintf("[C%d: ] at %s/s", i, (datasize.B * datasize.ByteSize(consumed/uint64(rollAfter/time.Second))).HR()))
 
 					consumed = 0
 					startedAt = time.Now()
