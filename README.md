@@ -16,7 +16,7 @@ Multiple | ✅ | ✅
 
 ## Design
 
-![architecture](./sc/architecture.png)
+![architecture](./sc/architecture.jpg)
 
 ## Stress Testing
 
