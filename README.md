@@ -50,7 +50,7 @@ touch main.go
 Now add `github.com/itzmeanjan/pubsub` as your project dependency
 
 ```bash
-go get github.com/itzmeanjan/pubsub # v0.1.4 latest
+go get github.com/itzmeanjan/pubsub # v0.1.5 latest
 ```
 
 And follow full [example](./example/main.go).
@@ -65,6 +65,11 @@ If you're planning to use `pubsub` in your application
 
 ```go
 broker := pubsub.New(ctx)
+
+// concurrent-safe utility method
+if !broker.IsAlive() {
+	return
+}
 
 // Start using broker 👇
 ```

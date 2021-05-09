@@ -15,9 +15,14 @@ func main() {
 	defer cancel()
 	// -- Starting pub/sub system
 
+	if !broker.IsAlive() {
+		log.Printf("❌ Failed to start pub/sub hub\n")
+		return
+	}
+
 	subscriber := broker.Subscribe(ctx, 16, "topic_1", "topic_2")
 	if subscriber == nil {
-		log.Printf("Failed to subscribe to topics\n")
+		log.Printf("❌ Failed to subscribe to topics\n")
 		return
 	}
 
@@ -66,5 +71,9 @@ func main() {
 
 	cancel()
 	<-time.After(time.Duration(100) * time.Microsecond)
+
+	if broker.IsAlive() {
+		log.Printf("❌ Failed to stop pub/sub hub\n")
+	}
 
 }
