@@ -12,7 +12,8 @@ import (
 //
 // In other words state manager of Pub/Sub Broker
 type PubSub struct {
-	Alive            bool
+	alive            bool
+	lock             *sync.RWMutex
 	index            uint64
 	messageChan      chan *publishRequest
 	subscriberIdChan chan chan uint64
@@ -25,7 +26,8 @@ type PubSub struct {
 // can be routed to various topics
 func New(ctx context.Context) *PubSub {
 	broker := &PubSub{
-		Alive:            false,
+		alive:            false,
+		lock:             &sync.RWMutex{},
 		index:            1,
 		messageChan:      make(chan *publishRequest, 1),
 		subscriberIdChan: make(chan chan uint64, 1),
@@ -43,7 +45,7 @@ func New(ctx context.Context) *PubSub {
 
 // Publish - Send message publishing request to N-topics in concurrent-safe manner
 func (p *PubSub) Publish(msg *Message) (bool, uint64) {
-	if p.Alive {
+	if p.IsAlive() {
 		resChan := make(chan uint64)
 		p.messageChan <- &publishRequest{Message: msg, ResponseChan: resChan}
 
@@ -58,7 +60,7 @@ func (p *PubSub) Publish(msg *Message) (bool, uint64) {
 //
 // More topics can be subscribed to later using returned subscriber instance.
 func (p *PubSub) Subscribe(ctx context.Context, cap int, topics ...string) *Subscriber {
-	if p.Alive {
+	if p.IsAlive() {
 		if len(topics) == 0 {
 			return nil
 		}
@@ -113,14 +115,14 @@ func (p *PubSub) start(ctx context.Context, started chan struct{}) {
 
 	// Because pub/sub system is now running
 	// & it's ready to process requests
-	p.Alive = true
+	p.toggleState()
 	close(started)
 
 	for {
 		select {
 
 		case <-ctx.Done():
-			p.Alive = false
+			p.toggleState()
 			return
 
 		case req := <-p.messageChan:
@@ -204,8 +206,24 @@ func (p *PubSub) start(ctx context.Context, started chan struct{}) {
 
 }
 
+// IsAlive - Check whether Hub is still alive or not [ concurrent-safe, good for external usage ]
+func (p *PubSub) IsAlive() bool {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+
+	return p.alive
+}
+
+// toggleState - Marks hub enabled/ disabled [ concurrent-safe, internal usage ]
+func (p *PubSub) toggleState() {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	p.alive = !p.alive
+}
+
 func (p *PubSub) nextId() (bool, uint64) {
-	if p.Alive {
+	if p.IsAlive() {
 		resChan := make(chan uint64)
 		p.subscriberIdChan <- resChan
 
@@ -216,7 +234,7 @@ func (p *PubSub) nextId() (bool, uint64) {
 }
 
 func (p *PubSub) addSubscription(subReq *subscriptionRequest) (bool, uint64) {
-	if p.Alive {
+	if p.IsAlive() {
 		resChan := make(chan uint64)
 		subReq.ResponseChan = resChan
 		p.subscribeChan <- subReq
@@ -228,7 +246,7 @@ func (p *PubSub) addSubscription(subReq *subscriptionRequest) (bool, uint64) {
 }
 
 func (p *PubSub) unsubscribe(unsubReq *unsubscriptionRequest) (bool, uint64) {
-	if p.Alive {
+	if p.IsAlive() {
 		resChan := make(chan uint64)
 		unsubReq.ResponseChan = resChan
 		p.unsubscribeChan <- unsubReq

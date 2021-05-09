@@ -45,7 +45,7 @@ func (s *Subscriber) AddSubscription(topics ...string) (bool, uint64) {
 	defer s.tLock.Unlock()
 
 	if len(topics) == 0 {
-		return s.hub.Alive, 0
+		return s.hub.IsAlive(), 0
 	}
 
 	for i := 0; i < len(topics); i++ {
@@ -65,7 +65,7 @@ func (s *Subscriber) Unsubscribe(topics ...string) (bool, uint64) {
 	defer s.tLock.Unlock()
 
 	if len(topics) == 0 {
-		return s.hub.Alive, 0
+		return s.hub.IsAlive(), 0
 	}
 
 	for i := 0; i < len(topics); i++ {
