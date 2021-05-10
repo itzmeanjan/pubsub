@@ -49,7 +49,7 @@ func New(ctx context.Context) *PubSub {
 func (p *PubSub) Publish(msg *Message) (bool, uint64) {
 	if p.IsAlive() {
 		resChan := make(chan uint64)
-		p.messageChan <- &publishRequest{Message: msg, ResponseChan: resChan}
+		p.messageChan <- &publishRequest{message: msg, responseChan: resChan}
 
 		return true, <-resChan
 	}
@@ -89,10 +89,10 @@ func (p *PubSub) Subscribe(ctx context.Context, cap int, topics ...string) *Subs
 
 		resChan := make(chan uint64)
 		p.subscribeChan <- &subscriptionRequest{
-			Id:           sub.id,
+			id:           sub.id,
 			info:         sub.info,
-			Topics:       topics,
-			ResponseChan: resChan,
+			topics:       topics,
+			responseChan: resChan,
 		}
 		<-resChan
 
@@ -122,12 +122,12 @@ func (p *PubSub) start(ctx context.Context, started chan struct{}) {
 
 		case req := <-p.messageChan:
 			var publishedOn uint64
-			var msgLen = len(req.Message.Data)
+			var msgLen = len(req.message.Data)
 
-			for i := 0; i < len(req.Message.Topics); i++ {
-				topic := req.Message.Topics[i]
+			for i := 0; i < len(req.message.Topics); i++ {
+				topic := req.message.Topics[i]
 
-				if subs, ok := p.subscribers[topic.String()]; ok && len(subs) != 0 {
+				if subs, ok := p.subscribers[topic]; ok && len(subs) != 0 {
 
 					for id := range subs {
 						sub, ok := p.subBuffer[id]
@@ -136,7 +136,7 @@ func (p *PubSub) start(ctx context.Context, started chan struct{}) {
 						}
 
 						buf := make([]byte, msgLen)
-						n := copy(buf, req.Message.Data)
+						n := copy(buf, req.message.Data)
 						if n != msgLen {
 							continue
 						}
@@ -155,7 +155,7 @@ func (p *PubSub) start(ctx context.Context, started chan struct{}) {
 				}
 			}
 
-			req.ResponseChan <- publishedOn
+			req.responseChan <- publishedOn
 
 		case req := <-p.subscriberIdChan:
 			req <- p.index
@@ -164,37 +164,37 @@ func (p *PubSub) start(ctx context.Context, started chan struct{}) {
 		case req := <-p.subscribeChan:
 			var subscribedTo uint64
 
-			if _, ok := p.subBuffer[req.Id]; !ok {
-				p.subBuffer[req.Id] = req.info
+			if _, ok := p.subBuffer[req.id]; !ok {
+				p.subBuffer[req.id] = req.info
 			}
 
-			for i := 0; i < len(req.Topics); i++ {
-				topic := req.Topics[i]
+			for i := 0; i < len(req.topics); i++ {
+				topic := req.topics[i]
 				subs, ok := p.subscribers[topic]
 				if !ok {
 					p.subscribers[topic] = make(map[uint64]bool)
-					p.subscribers[topic][req.Id] = true
+					p.subscribers[topic][req.id] = true
 					subscribedTo++
 
 					continue
 				}
 
-				if _, ok := subs[req.Id]; !ok {
-					subs[req.Id] = true
+				if _, ok := subs[req.id]; !ok {
+					subs[req.id] = true
 					subscribedTo++
 				}
 			}
 
-			req.ResponseChan <- subscribedTo
+			req.responseChan <- subscribedTo
 
 		case req := <-p.unsubscribeChan:
 			var unsubscribedFrom uint64
 
-			for i := 0; i < len(req.Topics); i++ {
-				topic := req.Topics[i]
+			for i := 0; i < len(req.topics); i++ {
+				topic := req.topics[i]
 				if subs, ok := p.subscribers[topic]; ok {
-					if _, ok := subs[req.Id]; ok {
-						delete(subs, req.Id)
+					if _, ok := subs[req.id]; ok {
+						delete(subs, req.id)
 						unsubscribedFrom++
 					}
 
@@ -204,12 +204,12 @@ func (p *PubSub) start(ctx context.Context, started chan struct{}) {
 				}
 			}
 
-			req.ResponseChan <- unsubscribedFrom
+			req.responseChan <- unsubscribedFrom
 
 		case req := <-p.destroyChan:
 
-			delete(p.subBuffer, req.Id)
-			req.RepsonseChan <- true
+			delete(p.subBuffer, req.id)
+			req.repsonseChan <- true
 
 		}
 	}
@@ -246,7 +246,7 @@ func (p *PubSub) nextId() (bool, uint64) {
 func (p *PubSub) addSubscription(subReq *subscriptionRequest) (bool, uint64) {
 	if p.IsAlive() {
 		resChan := make(chan uint64)
-		subReq.ResponseChan = resChan
+		subReq.responseChan = resChan
 		p.subscribeChan <- subReq
 
 		return true, <-resChan
@@ -258,7 +258,7 @@ func (p *PubSub) addSubscription(subReq *subscriptionRequest) (bool, uint64) {
 func (p *PubSub) unsubscribe(unsubReq *unsubscriptionRequest) (bool, uint64) {
 	if p.IsAlive() {
 		resChan := make(chan uint64)
-		unsubReq.ResponseChan = resChan
+		unsubReq.responseChan = resChan
 		p.unsubscribeChan <- unsubReq
 
 		return true, <-resChan
@@ -270,8 +270,9 @@ func (p *PubSub) unsubscribe(unsubReq *unsubscriptionRequest) (bool, uint64) {
 func (p *PubSub) destroy(destroyReq *destroyRequest) bool {
 	if p.IsAlive() {
 		resChan := make(chan bool)
-		destroyReq.RepsonseChan = resChan
+		destroyReq.repsonseChan = resChan
 		p.destroyChan <- destroyReq
+
 		return <-resChan
 	}
 

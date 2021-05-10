@@ -64,9 +64,9 @@ func (s *Subscriber) AddSubscription(topics ...string) (bool, uint64) {
 	}
 
 	return s.hub.addSubscription(&subscriptionRequest{
-		Id:     s.id,
+		id:     s.id,
 		info:   s.info,
-		Topics: topics,
+		topics: topics,
 	})
 }
 
@@ -84,8 +84,8 @@ func (s *Subscriber) Unsubscribe(topics ...string) (bool, uint64) {
 	}
 
 	return s.hub.unsubscribe(&unsubscriptionRequest{
-		Id:     s.id,
-		Topics: topics,
+		id:     s.id,
+		topics: topics,
 	})
 }
 
@@ -111,7 +111,7 @@ func (s *Subscriber) Destroy() bool {
 	ok, _ := s.UnsubscribeAll()
 	if ok {
 		return s.hub.destroy(&destroyRequest{
-			Id: s.id,
+			id: s.id,
 		})
 	}
 

@@ -32,38 +32,27 @@ func getRandomByteSlice(len int) []byte {
 	return buffer
 }
 
-func generateTopics(count int) []pubsub.String {
-	topics := make([]pubsub.String, count)
+func generateTopics(count int) []string {
+	topics := make([]string, count)
 
 	for i := 0; i < count; i++ {
-		topics[i] = pubsub.String(fmt.Sprintf("topic_%d", i))
+		topics[i] = fmt.Sprintf("topic_%d", i)
 	}
 
 	return topics
-}
-
-func _stringTopics(topics []pubsub.String) []string {
-	_topics := make([]string, len(topics))
-
-	for i := 0; i < len(topics); i++ {
-		_topics[i] = topics[i].String()
-	}
-
-	return _topics
 }
 
 func simulate(ctx context.Context, producers int, consumers int, topics int, rollAfter time.Duration, chunkSize datasize.ByteSize) {
 
 	broker := pubsub.New(ctx)
 	_topics := generateTopics(topics)
-	_stringTopics := _stringTopics(_topics)
 
 	<-time.After(time.Duration(100) * time.Microsecond)
 
 	subscribers := make([]*pubsub.Subscriber, 0, consumers)
 	for i := 0; i < consumers; i++ {
 
-		subscriber := broker.Subscribe(ctx, 256, _stringTopics...)
+		subscriber := broker.Subscribe(ctx, 256, _topics...)
 		if subscriber == nil {
 			return
 		}

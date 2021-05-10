@@ -32,10 +32,10 @@ func main() {
 	// During publishing if some topic doesn't have certain subscriber, it won't receive
 	// message later when it joins
 	msg := pubsub.Message{
-		Topics: []pubsub.String{
-			pubsub.String("topic_1"),
-			pubsub.String("topic_2"),
-			pubsub.String("topic_3"),
+		Topics: []string{
+			"topic_1",
+			"topic_2",
+			"topic_3",
 		},
 		Data: []byte("hello"),
 	}

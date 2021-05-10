@@ -4,27 +4,39 @@ import (
 	"sync"
 )
 
+// Message - Publisher showing intent of publishing arbitrary byte slice to topics
+type Message struct {
+	Topics []string
+	Data   []byte
+}
+
+// PublishedMessage - Subscriber will receive message for consumption in this form
+type PublishedMessage struct {
+	Topic string
+	Data  []byte
+}
+
 type publishRequest struct {
-	Message      *Message
-	ResponseChan chan uint64
+	message      *Message
+	responseChan chan uint64
 }
 
 type subscriptionRequest struct {
-	Id           uint64
+	id           uint64
 	info         *subscriberInfo
-	Topics       []string
-	ResponseChan chan uint64
+	topics       []string
+	responseChan chan uint64
 }
 
 type unsubscriptionRequest struct {
-	Id           uint64
-	Topics       []string
-	ResponseChan chan uint64
+	id           uint64
+	topics       []string
+	responseChan chan uint64
 }
 
 type destroyRequest struct {
-	Id           uint64
-	RepsonseChan chan bool
+	id           uint64
+	repsonseChan chan bool
 }
 
 type subscriberInfo struct {
