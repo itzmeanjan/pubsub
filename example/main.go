@@ -7,7 +7,7 @@ import (
 )
 
 func main() {
-	broker := pubsub.New()
+	broker := pubsub.New(1)
 
 	subscriber := broker.Subscribe(16, "topic_1", "topic_2")
 	if subscriber == nil {

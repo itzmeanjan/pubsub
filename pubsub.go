@@ -20,9 +20,9 @@ type PubSub struct {
 
 // New - Create a new Pub/Sub hub, using which messages
 // can be routed to various topics
-func New() *PubSub {
+func New(shardCount uint64) *PubSub {
 	broker := &PubSub{
-		shardCount:    2,
+		shardCount:    shardCount,
 		index:         1,
 		indexLock:     &sync.RWMutex{},
 		subscribers:   make(map[string]map[uint64]bool),

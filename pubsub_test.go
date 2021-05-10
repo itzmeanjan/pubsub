@@ -19,7 +19,7 @@ func TestPubSub(t *testing.T) {
 		msg      = Message{Topics: TOPICS_1, Data: DATA}
 	)
 
-	pubsub := New()
+	pubsub := New(2)
 
 	if count := pubsub.Publish(&msg); count != 0 {
 		t.Errorf("Expected subscriber count to be 0, got %d", count)
