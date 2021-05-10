@@ -13,8 +13,7 @@ type PubSub struct {
 	alive            bool
 	lock             *sync.RWMutex
 	index            uint64
-	pubMessageChan   chan *publishRequest
-	conMessageChan   chan *consumptionRequest
+	messageChan      chan *publishRequest
 	subscriberIdChan chan chan uint64
 	subscribeChan    chan *subscriptionRequest
 	unsubscribeChan  chan *unsubscriptionRequest
@@ -29,8 +28,7 @@ func New(ctx context.Context) *PubSub {
 		alive:            false,
 		lock:             &sync.RWMutex{},
 		index:            1,
-		pubMessageChan:   make(chan *publishRequest, 1),
-		conMessageChan:   make(chan *consumptionRequest, 1),
+		messageChan:      make(chan *publishRequest, 1),
 		subscriberIdChan: make(chan chan uint64, 1),
 		subscribeChan:    make(chan *subscriptionRequest, 1),
 		unsubscribeChan:  make(chan *unsubscriptionRequest, 1),
@@ -49,7 +47,7 @@ func New(ctx context.Context) *PubSub {
 func (p *PubSub) Publish(msg *Message) (bool, uint64) {
 	if p.IsAlive() {
 		resChan := make(chan uint64)
-		p.pubMessageChan <- &publishRequest{Message: msg, ResponseChan: resChan}
+		p.messageChan <- &publishRequest{Message: msg, ResponseChan: resChan}
 
 		return true, <-resChan
 	}
@@ -120,7 +118,7 @@ func (p *PubSub) start(ctx context.Context, started chan struct{}) {
 			p.toggleState()
 			return
 
-		case req := <-p.pubMessageChan:
+		case req := <-p.messageChan:
 			var publishedOn uint64
 			var msgLen = len(req.Message.Data)
 
@@ -157,18 +155,6 @@ func (p *PubSub) start(ctx context.Context, started chan struct{}) {
 			}
 
 			req.ResponseChan <- publishedOn
-
-		case req := <-p.conMessageChan:
-
-			sub, ok := p.subBuffer[req.Id]
-			if !ok {
-				req.ResponseChan <- false
-				break
-			}
-
-			sub.lock.RLock()
-			req.ResponseChan <- len(sub.buffer) > 0
-			sub.lock.RUnlock()
 
 		case req := <-p.subscriberIdChan:
 			req <- p.index

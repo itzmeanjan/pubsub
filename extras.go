@@ -9,11 +9,6 @@ type publishRequest struct {
 	ResponseChan chan uint64
 }
 
-type consumptionRequest struct {
-	Id           uint64
-	ResponseChan chan bool
-}
-
 type subscriptionRequest struct {
 	Id           uint64
 	info         *subscriberInfo
