@@ -38,6 +38,10 @@ func TestPubSub(t *testing.T) {
 		t.Errorf("Expected creation of subscriber")
 	}
 
+	if subscriber.Consumable() {
+		t.Errorf("Expected zero consumable message")
+	}
+
 	if _, count := pubsub.Publish(&msg); count != 1 {
 		t.Errorf("Expected subscriber count to be 1, got %d", count)
 	}
@@ -108,6 +112,10 @@ func TestPubSub(t *testing.T) {
 
 	if _, count := subscriber.UnsubscribeAll(); count != 0 {
 		t.Errorf("Expected to unsubscribe from 0 topic, got %d", count)
+	}
+
+	if !subscriber.Destroy() {
+		t.Errorf("Expected to destroy subscriber")
 	}
 
 	cancel()

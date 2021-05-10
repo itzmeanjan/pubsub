@@ -33,6 +33,7 @@ func New(ctx context.Context) *PubSub {
 		subscriberIdChan: make(chan chan uint64, 1),
 		subscribeChan:    make(chan *subscriptionRequest, 1),
 		unsubscribeChan:  make(chan *unsubscriptionRequest, 1),
+		destroyChan:      make(chan *destroyRequest, 1),
 		subscribers:      make(map[string]map[uint64]bool),
 		subBuffer:        make(map[uint64]*subscriberInfo),
 	}
