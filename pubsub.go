@@ -19,7 +19,9 @@ type PubSub struct {
 	unsubscribeChan chan *unsubscriptionRequest
 	destroyChan     chan *destroyRequest
 	subscribers     map[string]map[uint64]bool
+	subLock         *sync.RWMutex
 	subBuffer       map[uint64]*subscriberInfo
+	subBufferLock   *sync.RWMutex
 }
 
 // New - Create a new Pub/Sub hub, using which messages
@@ -35,7 +37,9 @@ func New(ctx context.Context) *PubSub {
 		unsubscribeChan: make(chan *unsubscriptionRequest, 1),
 		destroyChan:     make(chan *destroyRequest, 1),
 		subscribers:     make(map[string]map[uint64]bool),
+		subLock:         &sync.RWMutex{},
 		subBuffer:       make(map[uint64]*subscriberInfo),
+		subBufferLock:   &sync.RWMutex{},
 	}
 
 	started := make(chan struct{})
@@ -57,45 +61,47 @@ func (p *PubSub) Publish(msg *Message) (bool, uint64) {
 	return false, 0
 }
 
-// Subscribe - Create new subscriber instance with initial buffer capacity,
+// Subscribe - Create new subscriber instance with initial capacity,
 // listening for messages published on N-topics initially.
 //
 // More topics can be subscribed to later using returned subscriber instance.
 func (p *PubSub) Subscribe(ctx context.Context, cap int, topics ...string) *Subscriber {
-	if p.IsAlive() {
-		if len(topics) == 0 {
-			return nil
-		}
-
-		sub := &Subscriber{
-			id: p.nextId(),
-			info: &subscriberInfo{
-				ping:   make(chan struct{}, cap),
-				lock:   &sync.RWMutex{},
-				buffer: make([]*PublishedMessage, 0, cap),
-			},
-			tLock:  &sync.RWMutex{},
-			topics: make(map[string]bool),
-			hub:    p,
-		}
-
-		for i := 0; i < len(topics); i++ {
-			sub.topics[topics[i]] = true
-		}
-
-		resChan := make(chan uint64)
-		p.subscribeChan <- &subscriptionRequest{
-			id:           sub.id,
-			info:         sub.info,
-			topics:       topics,
-			responseChan: resChan,
-		}
-		<-resChan
-
-		return sub
+	if len(topics) == 0 {
+		return nil
 	}
 
-	return nil
+	sub := &Subscriber{
+		id: p.nextId(),
+		info: &subscriberInfo{
+			ping:   make(chan struct{}, cap),
+			lock:   &sync.RWMutex{},
+			buffer: make([]*PublishedMessage, 0, cap),
+		},
+		tLock:  &sync.RWMutex{},
+		topics: make(map[string]bool),
+		hub:    p,
+	}
+
+	for i := 0; i < len(topics); i++ {
+		sub.topics[topics[i]] = true
+	}
+
+	for i := 0; i < len(topics); i++ {
+		p.subLock.Lock()
+		subs, ok := p.subscribers[topics[i]]
+		if !ok {
+			subs = make(map[uint64]bool)
+		}
+		subs[sub.id] = true
+		p.subscribers[topics[i]] = subs
+		p.subLock.Unlock()
+	}
+
+	p.subBufferLock.Lock()
+	p.subBuffer[sub.id] = sub.info
+	p.subBufferLock.Unlock()
+
+	return sub
 }
 
 // start - Handles request from publishers & subscribers, so that
@@ -155,27 +161,6 @@ func (p *PubSub) start(ctx context.Context, started chan struct{}) {
 
 		case req := <-p.subscribeChan:
 			var subscribedTo uint64
-
-			if _, ok := p.subBuffer[req.id]; !ok {
-				p.subBuffer[req.id] = req.info
-			}
-
-			for i := 0; i < len(req.topics); i++ {
-				topic := req.topics[i]
-				subs, ok := p.subscribers[topic]
-				if !ok {
-					p.subscribers[topic] = make(map[uint64]bool)
-					p.subscribers[topic][req.id] = true
-					subscribedTo++
-
-					continue
-				}
-
-				if _, ok := subs[req.id]; !ok {
-					subs[req.id] = true
-					subscribedTo++
-				}
-			}
 
 			req.responseChan <- subscribedTo
 
