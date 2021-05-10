@@ -1,9 +1,9 @@
 package pubsub
 
 import (
+	"bytes"
 	"context"
 	"io"
-	"log"
 	"sync"
 )
 
@@ -20,7 +20,7 @@ type PubSub struct {
 	subscriberIdChan chan chan uint64
 	subscribeChan    chan *subscriptionRequest
 	unsubscribeChan  chan *unsubscriptionRequest
-	subscribers      map[string]map[uint64]*subscriberInfo
+	subscribers      map[string]map[uint64]bool
 	subBuffer        map[uint64]*subscriberInfo
 }
 
@@ -36,7 +36,8 @@ func New(ctx context.Context) *PubSub {
 		subscriberIdChan: make(chan chan uint64, 1),
 		subscribeChan:    make(chan *subscriptionRequest, 1),
 		unsubscribeChan:  make(chan *unsubscriptionRequest, 1),
-		subscribers:      make(map[string]map[uint64]*subscriberInfo),
+		subscribers:      make(map[string]map[uint64]bool),
+		subBuffer:        make(map[uint64]*subscriberInfo),
 	}
 
 	started := make(chan struct{})
@@ -131,30 +132,33 @@ func (p *PubSub) start(ctx context.Context, started chan struct{}) {
 
 		case req := <-p.pubMessageChan:
 			var publishedOn uint64
-			var msg = &PublishedMessage{Data: req.Message.Data}
+			var msgLen = len(req.Message.Data)
 
 			for i := 0; i < len(req.Message.Topics); i++ {
 				topic := req.Message.Topics[i]
 
-				if subs, ok := p.subscribers[topic.String()]; ok {
-					writers := make([]io.Writer, 0, 1)
+				if subs, ok := p.subscribers[topic.String()]; ok && len(subs) != 0 {
 
-					for _, w := range subs {
-						w.Ping <- struct{}{}
-						writers = append(writers, w.Writer)
+					for id := range subs {
+						buf := make([]byte, msgLen)
+						n := copy(buf, req.Message.Data)
+						if n != msgLen {
+							continue
+						}
+
+						msg := PublishedMessage{Topic: topic, Data: buf}
+						sub, ok := p.subBuffer[id]
+						if !ok {
+							continue
+						}
+
+						sub.lock.Lock()
+						sub.buffer = append(sub.buffer, &msg)
+						sub.lock.Unlock()
 
 						publishedOn++
 					}
 
-					if len(writers) != 0 {
-						w := io.MultiWriter(writers...)
-
-						msg.Topic = topic
-						if _, err := msg.WriteTo(w); err != nil {
-							log.Printf("[pubsub] Error : %s\n", err.Error())
-							continue
-						}
-					}
 				}
 			}
 
@@ -162,15 +166,15 @@ func (p *PubSub) start(ctx context.Context, started chan struct{}) {
 
 		case req := <-p.conMessageChan:
 
-			buf, ok := p.subBuffer[req.Id]
+			sub, ok := p.subBuffer[req.Id]
 			if !ok {
 				req.ResponseChan <- false
 				break
 			}
 
-			buf.lock.RLock()
-			req.ResponseChan <- len(buf.buffer) > 0
-			buf.lock.RUnlock()
+			sub.lock.RLock()
+			req.ResponseChan <- len(sub.buffer) > 0
+			sub.lock.RUnlock()
 
 		case req := <-p.subscriberIdChan:
 			req <- p.index
@@ -183,15 +187,15 @@ func (p *PubSub) start(ctx context.Context, started chan struct{}) {
 				topic := req.Topics[i]
 				subs, ok := p.subscribers[topic]
 				if !ok {
-					p.subscribers[topic] = make(map[uint64]*subscriberInfo)
-					p.subscribers[topic][req.Id] = req.info
+					p.subscribers[topic] = make(map[uint64]bool)
+					p.subscribers[topic][req.Id] = true
 					subscribedTo++
 
 					continue
 				}
 
 				if _, ok := subs[req.Id]; !ok {
-					subs[req.Id] = req.info
+					subs[req.Id] = true
 					subscribedTo++
 				}
 			}
@@ -220,6 +224,17 @@ func (p *PubSub) start(ctx context.Context, started chan struct{}) {
 		}
 	}
 
+}
+
+// Type conversion from byte buffer to writable stream
+func bufferToWritableStream(buf []*bytes.Buffer) []io.Writer {
+	_buf := make([]io.Writer, 0, len(buf))
+
+	for i := 0; i < len(buf); i++ {
+		_buf = append(_buf, io.Writer(buf[i]))
+	}
+
+	return _buf
 }
 
 // IsAlive - Check whether Hub is still alive or not [ concurrent-safe, good for external usage ]
