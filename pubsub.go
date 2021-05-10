@@ -9,26 +9,24 @@ import (
 //
 // In other words state manager of Pub/Sub Broker
 type PubSub struct {
-	shardCount    uint64
-	index         uint64
-	indexLock     *sync.RWMutex
-	subscribers   map[string]map[uint64]bool
-	subLock       *sync.RWMutex
-	subBuffer     map[uint64]*shard
-	subBufferLock *sync.RWMutex
+	shardCount  uint64
+	index       uint64
+	indexLock   *sync.RWMutex
+	subscribers map[string]map[uint64]bool
+	subLock     *sync.RWMutex
+	subBuffer   map[uint64]*shard
 }
 
 // New - Create a new Pub/Sub hub, using which messages
 // can be routed to various topics
 func New(shardCount uint64) *PubSub {
 	broker := &PubSub{
-		shardCount:    shardCount,
-		index:         1,
-		indexLock:     &sync.RWMutex{},
-		subscribers:   make(map[string]map[uint64]bool),
-		subLock:       &sync.RWMutex{},
-		subBuffer:     make(map[uint64]*shard),
-		subBufferLock: &sync.RWMutex{},
+		shardCount:  shardCount,
+		index:       1,
+		indexLock:   &sync.RWMutex{},
+		subscribers: make(map[string]map[uint64]bool),
+		subLock:     &sync.RWMutex{},
+		subBuffer:   make(map[uint64]*shard),
 	}
 
 	var i uint64 = 0

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"strings"
 	"testing"
-	"time"
 )
 
 func TestPubSub(t *testing.T) {
@@ -15,7 +14,6 @@ func TestPubSub(t *testing.T) {
 		DATA     = []byte("hello")
 		TOPICS_1 = []string{TOPIC_1}
 		TOPICS_2 = []string{TOPIC_1, TOPIC_2}
-		DURATION = time.Duration(1) * time.Millisecond
 		msg      = Message{Topics: TOPICS_1, Data: DATA}
 	)
 
@@ -42,8 +40,6 @@ func TestPubSub(t *testing.T) {
 		t.Errorf("Expected subscriber count to be 1, got %d", count)
 	}
 
-	<-time.After(DURATION)
-
 	if publishedMessage := subscriber.Next(); publishedMessage == nil || !bytes.Equal(publishedMessage.Data, DATA) {
 		t.Errorf("Expected to receive `%s`, got `%s`", DATA, publishedMessage.Data)
 	}
@@ -61,8 +57,6 @@ func TestPubSub(t *testing.T) {
 		t.Errorf("Expected to subscribe to 1 topics, did %d\n", c)
 	}
 
-	<-time.After(DURATION)
-
 	if publishedMessage := subscriber.Next(); publishedMessage == nil || !bytes.Equal(publishedMessage.Data, DATA) {
 		t.Errorf("Expected to receive `%s`, got `%s`", DATA, publishedMessage.Data)
 	}
@@ -74,8 +68,6 @@ func TestPubSub(t *testing.T) {
 		}
 
 	}
-
-	<-time.After(DURATION)
 
 	for i := 0; i < 8; i++ {
 
