@@ -31,11 +31,6 @@ type unsubscriptionRequest struct {
 	topics []string
 }
 
-type destroyRequest struct {
-	id           uint64
-	repsonseChan chan bool
-}
-
 type subscriberInfo struct {
 	ping   chan struct{}
 	lock   *sync.RWMutex

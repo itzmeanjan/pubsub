@@ -72,10 +72,7 @@ func simulate(ctx context.Context, producers int, consumers int, topics int, rol
 			}
 
 			for {
-				if ok, _ := broker.Publish(&msg); !ok {
-					break
-				}
-
+				broker.Publish(&msg)
 				published += uint64(len(msg.Data))
 
 				if time.Since(startedAt) >= rollAfter {

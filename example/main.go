@@ -34,13 +34,8 @@ func main() {
 		},
 		Data: []byte("hello"),
 	}
-	published, on := broker.Publish(&msg)
-	if !published {
-		log.Printf("Failed to publish message to topics\n")
-		return
-	}
 
-	log.Printf("✅ Published `hello` to %d topics\n", on)
+	log.Printf("✅ Published `hello` to %d topics\n", broker.Publish(&msg))
 
 	for range subscriber.Listener() {
 		msg := subscriber.Next()
@@ -68,13 +63,7 @@ func main() {
 		log.Printf("✅ Unsubscribed from `topic_1`\n")
 	}
 
-	published, on = broker.Publish(&msg)
-	if !published {
-		log.Printf("Failed to publish message to topics\n")
-		return
-	}
-
-	log.Printf("✅ Published `hello` to %d topics\n", on)
+	log.Printf("✅ Published `hello` to %d topics\n", broker.Publish(&msg))
 
 	for range subscriber.Listener() {
 		msg := subscriber.Next()

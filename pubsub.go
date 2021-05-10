@@ -39,12 +39,50 @@ func New(ctx context.Context) *PubSub {
 	return broker
 }
 
-// Publish - Send message publishing request to N-topics in concurrent-safe manner
-func (p *PubSub) Publish(msg *Message) (bool, uint64) {
-	resChan := make(chan uint64)
-	p.messageChan <- &publishRequest{message: msg, responseChan: resChan}
+// Publish - Publish message to N-topics in concurrent-safe manner
+func (p *PubSub) Publish(msg *Message) uint64 {
+	var c uint64
+	var mLen = len(msg.Data)
 
-	return true, <-resChan
+	for i := 0; i < len(msg.Topics); i++ {
+		topic := msg.Topics[i]
+
+		p.subLock.RLock()
+		subs, ok := p.subscribers[topic]
+		if ok && len(subs) != 0 {
+
+			for id := range subs {
+				p.subBufferLock.RLock()
+				sub, ok := p.subBuffer[id]
+				p.subBufferLock.RUnlock()
+
+				if !ok {
+					continue
+				}
+
+				buf := make([]byte, mLen)
+				n := copy(buf, msg.Data)
+				if n != mLen {
+					continue
+				}
+
+				sub.lock.Lock()
+				sub.buffer = append(sub.buffer, &PublishedMessage{Topic: topic, Data: buf})
+				sub.lock.Unlock()
+
+				if len(sub.ping) < cap(sub.ping) {
+					sub.ping <- struct{}{}
+				}
+
+				c++
+			}
+
+		}
+		p.subLock.RUnlock()
+
+	}
+
+	return c
 }
 
 // Subscribe - Create new subscriber instance with initial capacity,
@@ -93,52 +131,6 @@ func (p *PubSub) start(ctx context.Context, started chan struct{}) {
 	// Because pub/sub system is now running
 	// & it's ready to process requests
 	close(started)
-
-	for {
-		select {
-
-		case <-ctx.Done():
-			return
-
-		case req := <-p.messageChan:
-			var publishedOn uint64
-			var msgLen = len(req.message.Data)
-
-			for i := 0; i < len(req.message.Topics); i++ {
-				topic := req.message.Topics[i]
-
-				if subs, ok := p.subscribers[topic]; ok && len(subs) != 0 {
-
-					for id := range subs {
-						sub, ok := p.subBuffer[id]
-						if !ok {
-							continue
-						}
-
-						buf := make([]byte, msgLen)
-						n := copy(buf, req.message.Data)
-						if n != msgLen {
-							continue
-						}
-
-						sub.lock.Lock()
-						sub.buffer = append(sub.buffer, &PublishedMessage{Topic: topic, Data: buf})
-						sub.lock.Unlock()
-
-						if len(sub.ping) < cap(sub.ping) {
-							sub.ping <- struct{}{}
-						}
-
-						publishedOn++
-					}
-
-				}
-			}
-
-			req.responseChan <- publishedOn
-
-		}
-	}
 
 }
 

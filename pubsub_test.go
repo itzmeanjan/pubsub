@@ -23,7 +23,7 @@ func TestPubSub(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	pubsub := New(ctx)
 
-	if _, count := pubsub.Publish(&msg); count != 0 {
+	if count := pubsub.Publish(&msg); count != 0 {
 		t.Errorf("Expected subscriber count to be 0, got %d", count)
 	}
 
@@ -40,7 +40,7 @@ func TestPubSub(t *testing.T) {
 		t.Errorf("Expected zero consumable message")
 	}
 
-	if _, count := pubsub.Publish(&msg); count != 1 {
+	if count := pubsub.Publish(&msg); count != 1 {
 		t.Errorf("Expected subscriber count to be 1, got %d", count)
 	}
 
@@ -52,7 +52,7 @@ func TestPubSub(t *testing.T) {
 
 	msg = Message{Topics: TOPICS_2, Data: DATA}
 
-	if _, count := pubsub.Publish(&msg); count != 1 {
+	if count := pubsub.Publish(&msg); count != 1 {
 		t.Errorf("Expected subscriber count to be 1, got %d", count)
 	}
 
@@ -71,7 +71,7 @@ func TestPubSub(t *testing.T) {
 
 	for i := 0; i < 8; i++ {
 
-		if _, count := pubsub.Publish(&msg); count != 2 {
+		if count := pubsub.Publish(&msg); count != 2 {
 			t.Errorf("Expected subscriber count to be 2, got %d", count)
 		}
 
@@ -115,13 +115,5 @@ func TestPubSub(t *testing.T) {
 
 	cancel()
 	<-time.After(DURATION)
-
-	if published, _ := pubsub.Publish(&msg); published {
-		t.Errorf("Expected pub/sub system to be down")
-	}
-
-	if subscriber = pubsub.Subscribe(context.Background(), 16); subscriber != nil {
-		t.Errorf("Expected pub/sub system to be down")
-	}
 
 }
