@@ -64,7 +64,7 @@ func main() {
 		log.Printf("✅ Subscribed to `topic_3`\n")
 	}
 
-	if unsubscribed, _ := subscriber.Unsubscribe("topic_1"); unsubscribed {
+	if subscriber.Unsubscribe("topic_1") == 1 {
 		log.Printf("✅ Unsubscribed from `topic_1`\n")
 	}
 
@@ -93,9 +93,7 @@ func main() {
 		log.Printf("✅ Consumed all buffered messages\n")
 	}
 
-	if unsubscribed, from := subscriber.UnsubscribeAll(); unsubscribed {
-		log.Printf("✅ Unsubscribed from %d topic(s)\n", from)
-	}
+	log.Printf("✅ Unsubscribed from %d topic(s)\n", subscriber.UnsubscribeAll())
 
 	if subscriber.Destroy() {
 		log.Printf("✅ Destroyed subscriber\n")

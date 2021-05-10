@@ -70,12 +70,12 @@ func (s *Subscriber) AddSubscription(topics ...string) uint64 {
 }
 
 // Unsubscribe - Unsubscribe from specified subscribed topics
-func (s *Subscriber) Unsubscribe(topics ...string) (bool, uint64) {
+func (s *Subscriber) Unsubscribe(topics ...string) uint64 {
 	s.tLock.Lock()
 	defer s.tLock.Unlock()
 
 	if len(topics) == 0 {
-		return true, 0
+		return 0
 	}
 
 	for i := 0; i < len(topics); i++ {
@@ -89,7 +89,7 @@ func (s *Subscriber) Unsubscribe(topics ...string) (bool, uint64) {
 }
 
 // UnsubscribeAll - Unsubscribe from all active subscribed topics
-func (s *Subscriber) UnsubscribeAll() (bool, uint64) {
+func (s *Subscriber) UnsubscribeAll() uint64 {
 	s.tLock.RLock()
 	topics := make([]string, 0, len(s.topics))
 
@@ -107,12 +107,8 @@ func (s *Subscriber) UnsubscribeAll() (bool, uint64) {
 // Destroy - Ask hub to remove communication channel to this
 // subscriber
 func (s *Subscriber) Destroy() bool {
-	ok, _ := s.UnsubscribeAll()
-	if ok {
-		return s.hub.destroy(&destroyRequest{
-			id: s.id,
-		})
-	}
-
-	return false
+	s.UnsubscribeAll()
+	return s.hub.destroy(&destroyRequest{
+		id: s.id,
+	})
 }

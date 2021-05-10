@@ -91,23 +91,23 @@ func TestPubSub(t *testing.T) {
 
 	}
 
-	if _, count := subscriber.Unsubscribe(); count != 0 {
+	if count := subscriber.Unsubscribe(); count != 0 {
 		t.Errorf("Expected to unsubscribe from 0 topic, got %d", count)
 	}
 
-	if _, count := subscriber.Unsubscribe(TOPIC_1); count != 1 {
+	if count := subscriber.Unsubscribe(TOPIC_1); count != 1 {
 		t.Errorf("Expected to unsubscribe from 1 topic, got %d", count)
 	}
 
-	if _, count := subscriber.UnsubscribeAll(); count != 1 {
+	if count := subscriber.UnsubscribeAll(); count != 1 {
 		t.Errorf("Expected to unsubscribe from 1 topic, got %d", count)
 	}
 
-	if _, count := subscriber.Unsubscribe(TOPICS_2[0], TOPICS_2[1]); count != 0 {
+	if count := subscriber.Unsubscribe(TOPICS_2[0], TOPICS_2[1]); count != 0 {
 		t.Errorf("Expected to unsubscribe from 0 topic, got %d", count)
 	}
 
-	if _, count := subscriber.UnsubscribeAll(); count != 0 {
+	if count := subscriber.UnsubscribeAll(); count != 0 {
 		t.Errorf("Expected to unsubscribe from 0 topic, got %d", count)
 	}
 
@@ -119,14 +119,6 @@ func TestPubSub(t *testing.T) {
 	<-time.After(DURATION)
 
 	if published, _ := pubsub.Publish(&msg); published {
-		t.Errorf("Expected pub/sub system to be down")
-	}
-
-	if state, _ := subscriber.Unsubscribe(); state {
-		t.Errorf("Expected pub/sub system to be down")
-	}
-
-	if state, _ := subscriber.UnsubscribeAll(); state {
 		t.Errorf("Expected pub/sub system to be down")
 	}
 

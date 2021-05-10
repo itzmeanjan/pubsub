@@ -10,30 +10,28 @@ import (
 //
 // In other words state manager of Pub/Sub Broker
 type PubSub struct {
-	index           uint64
-	indexLock       *sync.RWMutex
-	messageChan     chan *publishRequest
-	unsubscribeChan chan *unsubscriptionRequest
-	destroyChan     chan *destroyRequest
-	subscribers     map[string]map[uint64]bool
-	subLock         *sync.RWMutex
-	subBuffer       map[uint64]*subscriberInfo
-	subBufferLock   *sync.RWMutex
+	index         uint64
+	indexLock     *sync.RWMutex
+	messageChan   chan *publishRequest
+	destroyChan   chan *destroyRequest
+	subscribers   map[string]map[uint64]bool
+	subLock       *sync.RWMutex
+	subBuffer     map[uint64]*subscriberInfo
+	subBufferLock *sync.RWMutex
 }
 
 // New - Create a new Pub/Sub hub, using which messages
 // can be routed to various topics
 func New(ctx context.Context) *PubSub {
 	broker := &PubSub{
-		index:           1,
-		indexLock:       &sync.RWMutex{},
-		messageChan:     make(chan *publishRequest, 1),
-		unsubscribeChan: make(chan *unsubscriptionRequest, 1),
-		destroyChan:     make(chan *destroyRequest, 1),
-		subscribers:     make(map[string]map[uint64]bool),
-		subLock:         &sync.RWMutex{},
-		subBuffer:       make(map[uint64]*subscriberInfo),
-		subBufferLock:   &sync.RWMutex{},
+		index:         1,
+		indexLock:     &sync.RWMutex{},
+		messageChan:   make(chan *publishRequest, 1),
+		destroyChan:   make(chan *destroyRequest, 1),
+		subscribers:   make(map[string]map[uint64]bool),
+		subLock:       &sync.RWMutex{},
+		subBuffer:     make(map[uint64]*subscriberInfo),
+		subBufferLock: &sync.RWMutex{},
 	}
 
 	started := make(chan struct{})
@@ -141,25 +139,6 @@ func (p *PubSub) start(ctx context.Context, started chan struct{}) {
 
 			req.responseChan <- publishedOn
 
-		case req := <-p.unsubscribeChan:
-			var unsubscribedFrom uint64
-
-			for i := 0; i < len(req.topics); i++ {
-				topic := req.topics[i]
-				if subs, ok := p.subscribers[topic]; ok {
-					if _, ok := subs[req.id]; ok {
-						delete(subs, req.id)
-						unsubscribedFrom++
-					}
-
-					if len(subs) == 0 {
-						delete(p.subscribers, topic)
-					}
-				}
-			}
-
-			req.responseChan <- unsubscribedFrom
-
 		case req := <-p.destroyChan:
 
 			delete(p.subBuffer, req.id)
@@ -199,12 +178,25 @@ func (p *PubSub) addSubscription(req *subscriptionRequest) uint64 {
 	return c
 }
 
-func (p *PubSub) unsubscribe(unsubReq *unsubscriptionRequest) (bool, uint64) {
-	resChan := make(chan uint64)
-	unsubReq.responseChan = resChan
-	p.unsubscribeChan <- unsubReq
+func (p *PubSub) unsubscribe(req *unsubscriptionRequest) uint64 {
+	var c uint64
 
-	return true, <-resChan
+	for i := 0; i < len(req.topics); i++ {
+		p.subLock.Lock()
+		if subs, ok := p.subscribers[req.topics[i]]; ok {
+			if _, ok := subs[req.id]; ok {
+				delete(subs, req.id)
+				c++
+			}
+
+			if len(subs) == 0 {
+				delete(p.subscribers, req.topics[i])
+			}
+		}
+		p.subLock.Unlock()
+	}
+
+	return c
 }
 
 func (p *PubSub) destroy(destroyReq *destroyRequest) bool {

@@ -27,9 +27,8 @@ type subscriptionRequest struct {
 }
 
 type unsubscriptionRequest struct {
-	id           uint64
-	topics       []string
-	responseChan chan uint64
+	id     uint64
+	topics []string
 }
 
 type destroyRequest struct {
