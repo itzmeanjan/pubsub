@@ -16,11 +16,6 @@ type PublishedMessage struct {
 	Data  []byte
 }
 
-type publishRequest struct {
-	message      *Message
-	responseChan chan uint64
-}
-
 type subscriptionRequest struct {
 	id     uint64
 	topics []string

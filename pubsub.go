@@ -12,7 +12,6 @@ import (
 type PubSub struct {
 	index         uint64
 	indexLock     *sync.RWMutex
-	messageChan   chan *publishRequest
 	subscribers   map[string]map[uint64]bool
 	subLock       *sync.RWMutex
 	subBuffer     map[uint64]*subscriberInfo
@@ -25,16 +24,11 @@ func New(ctx context.Context) *PubSub {
 	broker := &PubSub{
 		index:         1,
 		indexLock:     &sync.RWMutex{},
-		messageChan:   make(chan *publishRequest, 1),
 		subscribers:   make(map[string]map[uint64]bool),
 		subLock:       &sync.RWMutex{},
 		subBuffer:     make(map[uint64]*subscriberInfo),
 		subBufferLock: &sync.RWMutex{},
 	}
-
-	started := make(chan struct{})
-	go broker.start(ctx, started)
-	<-started
 
 	return broker
 }
@@ -120,18 +114,6 @@ func (p *PubSub) Subscribe(ctx context.Context, cap int, topics ...string) *Subs
 	p.subBufferLock.Unlock()
 
 	return sub
-}
-
-// start - Handles request from publishers & subscribers, so that
-// message publishing can be abstracted
-//
-// Consider running it as a go routine
-func (p *PubSub) start(ctx context.Context, started chan struct{}) {
-
-	// Because pub/sub system is now running
-	// & it's ready to process requests
-	close(started)
-
 }
 
 func (p *PubSub) nextId() uint64 {
