@@ -130,20 +130,19 @@ func (p *PubSub) start(ctx context.Context, started chan struct{}) {
 				if subs, ok := p.subscribers[topic.String()]; ok && len(subs) != 0 {
 
 					for id := range subs {
+						sub, ok := p.subBuffer[id]
+						if !ok {
+							continue
+						}
+
 						buf := make([]byte, msgLen)
 						n := copy(buf, req.Message.Data)
 						if n != msgLen {
 							continue
 						}
 
-						msg := PublishedMessage{Topic: topic, Data: buf}
-						sub, ok := p.subBuffer[id]
-						if !ok {
-							continue
-						}
-
 						sub.lock.Lock()
-						sub.buffer = append(sub.buffer, &msg)
+						sub.buffer = append(sub.buffer, &PublishedMessage{Topic: topic, Data: buf})
 						sub.lock.Unlock()
 
 						if len(sub.ping) < cap(sub.ping) {
@@ -209,13 +208,8 @@ func (p *PubSub) start(ctx context.Context, started chan struct{}) {
 
 		case req := <-p.destroyChan:
 
-			if _, ok := p.subBuffer[req.Id]; ok {
-				delete(p.subBuffer, req.Id)
-				req.RepsonseChan <- true
-				break
-			}
-
-			req.RepsonseChan <- false
+			delete(p.subBuffer, req.Id)
+			req.RepsonseChan <- true
 
 		}
 	}

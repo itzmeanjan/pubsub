@@ -105,6 +105,8 @@ func (s *Subscriber) UnsubscribeAll() (bool, uint64) {
 	return s.Unsubscribe(topics...)
 }
 
+// Destroy - Ask hub to remove communication channel to this
+// subscriber
 func (s *Subscriber) Destroy() bool {
 	ok, _ := s.UnsubscribeAll()
 	if ok {
