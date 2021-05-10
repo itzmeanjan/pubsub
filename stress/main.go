@@ -76,20 +76,27 @@ func simulate(ctx context.Context, producers int, consumers int, topics int, rol
 
 			var published uint64
 			var startedAt = time.Now()
+
+			var totalTimeSpent time.Duration
+			var totalMsg uint64
+
 			msg := pubsub.Message{
 				Topics: _topics,
 				Data:   getRandomByteSlice(int(chunkSize)),
 			}
 
 			for {
+				var pubStart = time.Now()
 				if ok, _ := broker.Publish(&msg); !ok {
 					break
 				}
+				totalTimeSpent += time.Since(pubStart)
+				totalMsg++
 
 				published += uint64(len(msg.Data))
 
 				if time.Since(startedAt) >= rollAfter {
-					log.Println(color.Blue.Sprintf("[P%d: ] at %s/s", i, (datasize.B * datasize.ByteSize(published/uint64(rollAfter/time.Second))).HR()))
+					log.Println(color.Blue.Sprintf("[P%d: ] at %s/s | avg ts : %s", i, (datasize.B * datasize.ByteSize(published/uint64(rollAfter/time.Second))).HR(), totalTimeSpent/time.Duration(totalMsg)))
 
 					published = 0
 					startedAt = time.Now()
