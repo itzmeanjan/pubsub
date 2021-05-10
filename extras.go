@@ -1,7 +1,6 @@
 package pubsub
 
 import (
-	"io"
 	"sync"
 )
 
@@ -29,8 +28,7 @@ type unsubscriptionRequest struct {
 }
 
 type subscriberInfo struct {
-	Ping   chan struct{}
+	ping   chan struct{}
 	lock   *sync.RWMutex
 	buffer []*PublishedMessage
-	Writer io.Writer
 }

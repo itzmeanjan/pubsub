@@ -72,21 +72,17 @@ func (p *PubSub) Subscribe(ctx context.Context, cap int, topics ...string) *Subs
 		if !ok {
 			return nil
 		}
-		r, w := io.Pipe()
 
 		sub := &Subscriber{
-			id:     id,
-			reader: r,
+			id: id,
 			info: &subscriberInfo{
-				Writer: w,
-				Ping:   make(chan struct{}, cap),
+				ping:   make(chan struct{}, cap),
+				lock:   &sync.RWMutex{},
+				buffer: make([]*PublishedMessage, 0, cap),
 			},
-			mLock:    &sync.RWMutex{},
-			tLock:    &sync.RWMutex{},
-			topics:   make(map[string]bool),
-			Listener: make(chan struct{}, cap),
-			buffer:   make([]*PublishedMessage, 0, cap),
-			hub:      p,
+			tLock:  &sync.RWMutex{},
+			topics: make(map[string]bool),
+			hub:    p,
 		}
 
 		for i := 0; i < len(topics); i++ {
@@ -182,6 +178,10 @@ func (p *PubSub) start(ctx context.Context, started chan struct{}) {
 
 		case req := <-p.subscribeChan:
 			var subscribedTo uint64
+
+			if _, ok := p.subBuffer[req.Id]; !ok {
+				p.subBuffer[req.Id] = req.info
+			}
 
 			for i := 0; i < len(req.Topics); i++ {
 				topic := req.Topics[i]
