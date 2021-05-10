@@ -9,14 +9,15 @@ import (
 // Subscriber - Uniquely identifiable subscriber with multiple
 // subscribed topics from where it wishes to listen from over ping channel
 type Subscriber struct {
-	id     uint64
-	reader io.Reader
-	info   *subscriberInfo
-	mLock  *sync.RWMutex
-	tLock  *sync.RWMutex
-	topics map[string]bool
-	buffer []*PublishedMessage
-	hub    *PubSub
+	id       uint64
+	reader   io.Reader
+	info     *subscriberInfo
+	mLock    *sync.RWMutex
+	tLock    *sync.RWMutex
+	topics   map[string]bool
+	Listener chan struct{}
+	buffer   []*PublishedMessage
+	hub      *PubSub
 }
 
 // Next - Attempt to consume oldest message living in buffer,
@@ -116,6 +117,9 @@ func (s *Subscriber) start(ctx context.Context, started chan struct{}) {
 			s.mLock.Lock()
 			s.buffer = append(s.buffer, msg)
 			s.mLock.Unlock()
+
+			// notify
+			s.Listener <- struct{}{}
 
 		}
 	}

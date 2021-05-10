@@ -77,11 +77,12 @@ func (p *PubSub) Subscribe(ctx context.Context, cap int, topics ...string) *Subs
 				Writer: w,
 				Ping:   make(chan struct{}, cap),
 			},
-			mLock:  &sync.RWMutex{},
-			tLock:  &sync.RWMutex{},
-			topics: make(map[string]bool),
-			buffer: make([]*PublishedMessage, 0, cap),
-			hub:    p,
+			mLock:    &sync.RWMutex{},
+			tLock:    &sync.RWMutex{},
+			topics:   make(map[string]bool),
+			Listener: make(chan struct{}, cap),
+			buffer:   make([]*PublishedMessage, 0, cap),
+			hub:      p,
 		}
 
 		for i := 0; i < len(topics); i++ {
