@@ -47,7 +47,6 @@ func main() {
 
 	log.Printf("✅ Published `hello` to %d topics\n", on)
 
-	var receivedC uint64
 	for range subscriber.Listener() {
 		msg := subscriber.Next()
 		if msg == nil {
@@ -56,10 +55,13 @@ func main() {
 
 		log.Printf("✅ Received `%s` on topic `%s`\n", msg.Data, msg.Topic)
 
-		receivedC++
-		if receivedC >= 2 {
+		if !subscriber.Consumable() {
 			break
 		}
+	}
+
+	if !subscriber.Consumable() {
+		log.Printf("✅ Consumed all buffered messages\n")
 	}
 
 	// Subscribe to new topic using same subscriber instance
@@ -71,8 +73,37 @@ func main() {
 		log.Printf("✅ Unsubscribed from `topic_1`\n")
 	}
 
+	published, on = broker.Publish(&msg)
+	if !published {
+		log.Printf("Failed to publish message to topics\n")
+		return
+	}
+
+	log.Printf("✅ Published `hello` to %d topics\n", on)
+
+	for range subscriber.Listener() {
+		msg := subscriber.Next()
+		if msg == nil {
+			break
+		}
+
+		log.Printf("✅ Received `%s` on topic `%s`\n", msg.Data, msg.Topic)
+
+		if !subscriber.Consumable() {
+			break
+		}
+	}
+
+	if !subscriber.Consumable() {
+		log.Printf("✅ Consumed all buffered messages\n")
+	}
+
 	if unsubscribed, from := subscriber.UnsubscribeAll(); unsubscribed {
 		log.Printf("✅ Unsubscribed from %d topic(s)\n", from)
+	}
+
+	if subscriber.Destroy() {
+		log.Printf("✅ Destroyed subscriber\n")
 	}
 
 	cancel()
