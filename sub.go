@@ -126,8 +126,9 @@ func (s *Subscriber) start(ctx context.Context, started chan struct{}) {
 			s.buffer = append(s.buffer, msg)
 			s.mLock.Unlock()
 
-			// notify
-			s.Listener <- struct{}{}
+			if len(s.Listener) < cap(s.Listener) {
+				s.Listener <- struct{}{}
+			}
 
 		}
 	}

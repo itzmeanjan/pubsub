@@ -47,13 +47,19 @@ func main() {
 
 	log.Printf("✅ Published `hello` to %d topics\n", on)
 
-	for {
+	var receivedC uint64
+	for range subscriber.Listener {
 		msg := subscriber.Next()
 		if msg == nil {
 			break
 		}
 
 		log.Printf("✅ Received `%s` on topic `%s`\n", msg.Data, msg.Topic)
+
+		receivedC++
+		if receivedC >= 2 {
+			break
+		}
 	}
 
 	// Subscribe to new topic using same subscriber instance
