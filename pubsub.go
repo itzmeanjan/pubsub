@@ -152,6 +152,10 @@ func (p *PubSub) start(ctx context.Context, started chan struct{}) {
 						sub.buffer = append(sub.buffer, &msg)
 						sub.lock.Unlock()
 
+						if len(sub.ping) < cap(sub.ping) {
+							sub.ping <- struct{}{}
+						}
+
 						publishedOn++
 					}
 
