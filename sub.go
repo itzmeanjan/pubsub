@@ -22,12 +22,15 @@ type Subscriber struct {
 // Next - Attempt to consume oldest message living in buffer,
 // by popping it out, in concurrent-safe manner
 func (s *Subscriber) Next() *PublishedMessage {
-	s.mLock.Lock()
-	defer s.mLock.Unlock()
-
+	s.mLock.RLock()
 	if len(s.buffer) == 0 {
+		s.mLock.RUnlock()
 		return nil
 	}
+	s.mLock.RUnlock()
+
+	s.mLock.Lock()
+	defer s.mLock.Unlock()
 
 	msg := s.buffer[0]
 	n := len(s.buffer)
