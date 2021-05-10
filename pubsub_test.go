@@ -56,12 +56,11 @@ func TestPubSub(t *testing.T) {
 		t.Errorf("Expected subscriber count to be 1, got %d", count)
 	}
 
-	if _, count := subscriber.AddSubscription(); count != 0 {
-		t.Errorf("Expected to subscribe to 0 new topic, got %d", count)
+	if subscriber.AddSubscription() != 0 {
+		t.Errorf("Expected to subscribe to 0 topics")
 	}
-
-	if _, count := subscriber.AddSubscription(TOPICS_2[0], TOPICS_2[1]); count != 1 {
-		t.Errorf("Expected to subscribe to 1 new topic, got %d", count)
+	if c := subscriber.AddSubscription(TOPICS_2[0], TOPICS_2[1]); c != 2 {
+		t.Errorf("Expected to subscribe to 2 topics, did %d\n", c)
 	}
 
 	<-time.After(DURATION)
@@ -120,10 +119,6 @@ func TestPubSub(t *testing.T) {
 	<-time.After(DURATION)
 
 	if published, _ := pubsub.Publish(&msg); published {
-		t.Errorf("Expected pub/sub system to be down")
-	}
-
-	if state, _ := subscriber.AddSubscription(); state {
 		t.Errorf("Expected pub/sub system to be down")
 	}
 

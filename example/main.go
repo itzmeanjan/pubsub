@@ -60,7 +60,7 @@ func main() {
 	}
 
 	// Subscribe to new topic using same subscriber instance
-	if subscribed, _ := subscriber.AddSubscription("topic_3"); subscribed {
+	if subscriber.AddSubscription("topic_3") == 1 {
 		log.Printf("✅ Subscribed to `topic_3`\n")
 	}
 

@@ -22,10 +22,8 @@ type publishRequest struct {
 }
 
 type subscriptionRequest struct {
-	id           uint64
-	info         *subscriberInfo
-	topics       []string
-	responseChan chan uint64
+	id     uint64
+	topics []string
 }
 
 type unsubscriptionRequest struct {

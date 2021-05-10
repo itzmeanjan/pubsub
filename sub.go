@@ -51,12 +51,12 @@ func (s *Subscriber) Next() *PublishedMessage {
 }
 
 // AddSubscription - Add subscriptions to more topics on-the-fly
-func (s *Subscriber) AddSubscription(topics ...string) (bool, uint64) {
+func (s *Subscriber) AddSubscription(topics ...string) uint64 {
 	s.tLock.Lock()
 	defer s.tLock.Unlock()
 
 	if len(topics) == 0 {
-		return true, 0
+		return 0
 	}
 
 	for i := 0; i < len(topics); i++ {
@@ -65,7 +65,6 @@ func (s *Subscriber) AddSubscription(topics ...string) (bool, uint64) {
 
 	return s.hub.addSubscription(&subscriptionRequest{
 		id:     s.id,
-		info:   s.info,
 		topics: topics,
 	})
 }

@@ -76,16 +76,10 @@ func (p *PubSub) Subscribe(ctx context.Context, cap int, topics ...string) *Subs
 		sub.topics[topics[i]] = true
 	}
 
-	for i := 0; i < len(topics); i++ {
-		p.subLock.Lock()
-		subs, ok := p.subscribers[topics[i]]
-		if !ok {
-			subs = make(map[uint64]bool)
-		}
-		subs[sub.id] = true
-		p.subscribers[topics[i]] = subs
-		p.subLock.Unlock()
-	}
+	p.addSubscription(&subscriptionRequest{
+		id:     sub.id,
+		topics: topics,
+	})
 
 	p.subBufferLock.Lock()
 	p.subBuffer[sub.id] = sub.info
@@ -185,8 +179,24 @@ func (p *PubSub) nextId() uint64 {
 	return id
 }
 
-func (p *PubSub) addSubscription(subReq *subscriptionRequest) (bool, uint64) {
-	return false, 0
+func (p *PubSub) addSubscription(req *subscriptionRequest) uint64 {
+	var c uint64
+
+	for i := 0; i < len(req.topics); i++ {
+		p.subLock.Lock()
+		subs, ok := p.subscribers[req.topics[i]]
+		if !ok {
+			subs = make(map[uint64]bool)
+		}
+		if _, ok := subs[req.id]; !ok {
+			subs[req.id] = true
+			c++
+		}
+		p.subscribers[req.topics[i]] = subs
+		p.subLock.Unlock()
+	}
+
+	return c
 }
 
 func (p *PubSub) unsubscribe(unsubReq *unsubscriptionRequest) (bool, uint64) {
