@@ -112,7 +112,7 @@ func simulate(ctx context.Context, producers int, consumers int, topics int, rol
 			var consumed uint64
 			var startedAt = time.Now()
 
-			for range subscriber.Listener {
+			for range subscriber.Listener() {
 				msg := subscriber.Next()
 				if msg == nil {
 					continue

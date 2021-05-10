@@ -1,32 +1,31 @@
 package pubsub
 
 import (
-	"context"
-	"io"
 	"sync"
 )
 
 // Subscriber - Uniquely identifiable subscriber with multiple
 // subscribed topics from where it wishes to listen from over ping channel
 type Subscriber struct {
-	id       uint64
-	reader   io.Reader
-	info     *subscriberInfo
-	mLock    *sync.RWMutex
-	tLock    *sync.RWMutex
-	topics   map[string]bool
-	Listener chan struct{}
-	buffer   []*PublishedMessage
-	hub      *PubSub
+	id     uint64
+	info   *subscriberInfo
+	tLock  *sync.RWMutex
+	topics map[string]bool
+	hub    *PubSub
+}
+
+// Listener - Get notified when new message is received
+func (s *Subscriber) Listener() chan struct{} {
+	return s.info.ping
 }
 
 // Consumable - Checks whether any consumable messages
 // in buffer or not [ concurrent-safe ]
 func (s *Subscriber) Consumable() bool {
-	s.mLock.RLock()
-	defer s.mLock.RUnlock()
+	s.info.lock.RLock()
+	defer s.info.lock.RUnlock()
 
-	return len(s.buffer) != 0
+	return len(s.info.buffer) != 0
 }
 
 // Next - Attempt to consume oldest message living in buffer,
@@ -38,15 +37,15 @@ func (s *Subscriber) Next() *PublishedMessage {
 		return nil
 	}
 
-	s.mLock.Lock()
-	defer s.mLock.Unlock()
+	s.info.lock.Lock()
+	defer s.info.lock.Unlock()
 
-	msg := s.buffer[0]
-	n := len(s.buffer)
+	msg := s.info.buffer[0]
+	n := len(s.info.buffer)
 
-	copy(s.buffer[:], s.buffer[1:])
-	s.buffer[n-1] = nil
-	s.buffer = s.buffer[:n-1]
+	copy(s.info.buffer[:], s.info.buffer[1:])
+	s.info.buffer[n-1] = nil
+	s.info.buffer = s.info.buffer[:n-1]
 
 	return msg
 }
@@ -104,32 +103,4 @@ func (s *Subscriber) UnsubscribeAll() (bool, uint64) {
 	s.tLock.RUnlock()
 
 	return s.Unsubscribe(topics...)
-}
-
-// start - Underlying message consumer from readable stream, starts
-// working when notified to do so
-func (s *Subscriber) start(ctx context.Context, started chan struct{}) {
-	close(started)
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-
-		case <-s.info.Ping:
-			msg := new(PublishedMessage)
-			if _, err := msg.ReadFrom(s.reader); err != nil {
-				continue
-			}
-
-			s.mLock.Lock()
-			s.buffer = append(s.buffer, msg)
-			s.mLock.Unlock()
-
-			if len(s.Listener) < cap(s.Listener) {
-				s.Listener <- struct{}{}
-			}
-
-		}
-	}
 }

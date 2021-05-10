@@ -48,7 +48,7 @@ func main() {
 	log.Printf("✅ Published `hello` to %d topics\n", on)
 
 	var receivedC uint64
-	for range subscriber.Listener {
+	for range subscriber.Listener() {
 		msg := subscriber.Next()
 		if msg == nil {
 			break

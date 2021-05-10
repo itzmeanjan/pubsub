@@ -1,9 +1,7 @@
 package pubsub
 
 import (
-	"bytes"
 	"context"
-	"io"
 	"sync"
 )
 
@@ -96,11 +94,7 @@ func (p *PubSub) Subscribe(ctx context.Context, cap int, topics ...string) *Subs
 			Topics:       topics,
 			ResponseChan: resChan,
 		}
-
-		started := make(chan struct{})
-		go sub.start(ctx, started)
 		<-resChan
-		<-started
 
 		return sub
 	}
@@ -228,17 +222,6 @@ func (p *PubSub) start(ctx context.Context, started chan struct{}) {
 		}
 	}
 
-}
-
-// Type conversion from byte buffer to writable stream
-func bufferToWritableStream(buf []*bytes.Buffer) []io.Writer {
-	_buf := make([]io.Writer, 0, len(buf))
-
-	for i := 0; i < len(buf); i++ {
-		_buf = append(_buf, io.Writer(buf[i]))
-	}
-
-	return _buf
 }
 
 // IsAlive - Check whether Hub is still alive or not [ concurrent-safe, good for external usage ]
