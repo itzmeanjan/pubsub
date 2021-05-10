@@ -9,11 +9,12 @@ import (
 //
 // In other words state manager of Pub/Sub Broker
 type PubSub struct {
+	shardCount    uint64
 	index         uint64
 	indexLock     *sync.RWMutex
 	subscribers   map[string]map[uint64]bool
 	subLock       *sync.RWMutex
-	subBuffer     map[uint64]*subscriberInfo
+	subBuffer     map[uint64]*shard
 	subBufferLock *sync.RWMutex
 }
 
@@ -21,12 +22,18 @@ type PubSub struct {
 // can be routed to various topics
 func New() *PubSub {
 	broker := &PubSub{
+		shardCount:    2,
 		index:         1,
 		indexLock:     &sync.RWMutex{},
 		subscribers:   make(map[string]map[uint64]bool),
 		subLock:       &sync.RWMutex{},
-		subBuffer:     make(map[uint64]*subscriberInfo),
+		subBuffer:     make(map[uint64]*shard),
 		subBufferLock: &sync.RWMutex{},
+	}
+
+	var i uint64 = 0
+	for ; i < broker.shardCount; i++ {
+		broker.subBuffer[i] = &shard{lock: &sync.RWMutex{}, subscribers: make(map[uint64]*subscriberInfo)}
 	}
 
 	return broker
@@ -45,10 +52,14 @@ func (p *PubSub) Publish(msg *Message) uint64 {
 		if ok && len(subs) != 0 {
 
 			for id := range subs {
-				p.subBufferLock.RLock()
-				sub, ok := p.subBuffer[id]
-				p.subBufferLock.RUnlock()
+				shard, ok := p.subBuffer[id%p.shardCount]
+				if !ok {
+					continue
+				}
 
+				shard.lock.RLock()
+				sub, ok := shard.subscribers[id]
+				shard.lock.RUnlock()
 				if !ok {
 					continue
 				}
@@ -108,9 +119,10 @@ func (p *PubSub) Subscribe(cap int, topics ...string) *Subscriber {
 		topics: topics,
 	})
 
-	p.subBufferLock.Lock()
-	p.subBuffer[sub.id] = sub.info
-	p.subBufferLock.Unlock()
+	shard := p.subBuffer[sub.id%p.shardCount]
+	shard.lock.Lock()
+	shard.subscribers[sub.id] = sub.info
+	shard.lock.Unlock()
 
 	return sub
 }
@@ -166,8 +178,13 @@ func (p *PubSub) unsubscribe(req *unsubscriptionRequest) uint64 {
 }
 
 func (p *PubSub) destroy(id uint64) {
-	p.subBufferLock.Lock()
-	defer p.subBufferLock.Unlock()
+	shard, ok := p.subBuffer[id%p.shardCount]
+	if !ok {
+		return
+	}
 
-	delete(p.subBuffer, id)
+	shard.lock.Lock()
+	defer shard.lock.Unlock()
+
+	delete(shard.subscribers, id)
 }

@@ -31,3 +31,8 @@ type subscriberInfo struct {
 	lock   *sync.RWMutex
 	buffer []*PublishedMessage
 }
+
+type shard struct {
+	lock        *sync.RWMutex
+	subscribers map[uint64]*subscriberInfo
+}
