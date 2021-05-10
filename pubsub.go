@@ -15,11 +15,13 @@ type PubSub struct {
 	alive            bool
 	lock             *sync.RWMutex
 	index            uint64
-	messageChan      chan *publishRequest
+	pubMessageChan   chan *publishRequest
+	conMessageChan   chan *consumptionRequest
 	subscriberIdChan chan chan uint64
 	subscribeChan    chan *subscriptionRequest
 	unsubscribeChan  chan *unsubscriptionRequest
 	subscribers      map[string]map[uint64]*subscriberInfo
+	subBuffer        map[uint64]*subscriberInfo
 }
 
 // New - Create a new Pub/Sub hub, using which messages
@@ -29,7 +31,8 @@ func New(ctx context.Context) *PubSub {
 		alive:            false,
 		lock:             &sync.RWMutex{},
 		index:            1,
-		messageChan:      make(chan *publishRequest, 1),
+		pubMessageChan:   make(chan *publishRequest, 1),
+		conMessageChan:   make(chan *consumptionRequest, 1),
 		subscriberIdChan: make(chan chan uint64, 1),
 		subscribeChan:    make(chan *subscriptionRequest, 1),
 		unsubscribeChan:  make(chan *unsubscriptionRequest, 1),
@@ -47,7 +50,7 @@ func New(ctx context.Context) *PubSub {
 func (p *PubSub) Publish(msg *Message) (bool, uint64) {
 	if p.IsAlive() {
 		resChan := make(chan uint64)
-		p.messageChan <- &publishRequest{Message: msg, ResponseChan: resChan}
+		p.pubMessageChan <- &publishRequest{Message: msg, ResponseChan: resChan}
 
 		return true, <-resChan
 	}
@@ -126,7 +129,7 @@ func (p *PubSub) start(ctx context.Context, started chan struct{}) {
 			p.toggleState()
 			return
 
-		case req := <-p.messageChan:
+		case req := <-p.pubMessageChan:
 			var publishedOn uint64
 			var msg = &PublishedMessage{Data: req.Message.Data}
 
@@ -156,6 +159,18 @@ func (p *PubSub) start(ctx context.Context, started chan struct{}) {
 			}
 
 			req.ResponseChan <- publishedOn
+
+		case req := <-p.conMessageChan:
+
+			buf, ok := p.subBuffer[req.Id]
+			if !ok {
+				req.ResponseChan <- false
+				break
+			}
+
+			buf.lock.RLock()
+			req.ResponseChan <- len(buf.buffer) > 0
+			buf.lock.RUnlock()
 
 		case req := <-p.subscriberIdChan:
 			req <- p.index
