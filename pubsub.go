@@ -13,7 +13,6 @@ type PubSub struct {
 	index         uint64
 	indexLock     *sync.RWMutex
 	messageChan   chan *publishRequest
-	destroyChan   chan *destroyRequest
 	subscribers   map[string]map[uint64]bool
 	subLock       *sync.RWMutex
 	subBuffer     map[uint64]*subscriberInfo
@@ -27,7 +26,6 @@ func New(ctx context.Context) *PubSub {
 		index:         1,
 		indexLock:     &sync.RWMutex{},
 		messageChan:   make(chan *publishRequest, 1),
-		destroyChan:   make(chan *destroyRequest, 1),
 		subscribers:   make(map[string]map[uint64]bool),
 		subLock:       &sync.RWMutex{},
 		subBuffer:     make(map[uint64]*subscriberInfo),
@@ -139,11 +137,6 @@ func (p *PubSub) start(ctx context.Context, started chan struct{}) {
 
 			req.responseChan <- publishedOn
 
-		case req := <-p.destroyChan:
-
-			delete(p.subBuffer, req.id)
-			req.repsonseChan <- true
-
 		}
 	}
 
@@ -199,10 +192,9 @@ func (p *PubSub) unsubscribe(req *unsubscriptionRequest) uint64 {
 	return c
 }
 
-func (p *PubSub) destroy(destroyReq *destroyRequest) bool {
-	resChan := make(chan bool)
-	destroyReq.repsonseChan = resChan
-	p.destroyChan <- destroyReq
+func (p *PubSub) destroy(id uint64) {
+	p.subBufferLock.Lock()
+	defer p.subBufferLock.Unlock()
 
-	return <-resChan
+	delete(p.subBuffer, id)
 }

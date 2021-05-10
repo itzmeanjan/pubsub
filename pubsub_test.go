@@ -111,9 +111,7 @@ func TestPubSub(t *testing.T) {
 		t.Errorf("Expected to unsubscribe from 0 topic, got %d", count)
 	}
 
-	if !subscriber.Destroy() {
-		t.Errorf("Expected to destroy subscriber")
-	}
+	subscriber.Destroy()
 
 	cancel()
 	<-time.After(DURATION)

@@ -95,9 +95,8 @@ func main() {
 
 	log.Printf("✅ Unsubscribed from %d topic(s)\n", subscriber.UnsubscribeAll())
 
-	if subscriber.Destroy() {
-		log.Printf("✅ Destroyed subscriber\n")
-	}
+	subscriber.Destroy()
+	log.Printf("✅ Destroyed subscriber\n")
 
 	cancel()
 	<-time.After(time.Duration(100) * time.Microsecond)

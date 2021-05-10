@@ -104,11 +104,8 @@ func (s *Subscriber) UnsubscribeAll() uint64 {
 	return s.Unsubscribe(topics...)
 }
 
-// Destroy - Ask hub to remove communication channel to this
-// subscriber
-func (s *Subscriber) Destroy() bool {
+// Destroy - Asks hub to remove communication channel to this subscriber
+func (s *Subscriber) Destroy() {
 	s.UnsubscribeAll()
-	return s.hub.destroy(&destroyRequest{
-		id: s.id,
-	})
+	s.hub.destroy(s.id)
 }
