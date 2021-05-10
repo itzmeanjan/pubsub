@@ -20,15 +20,23 @@ type Subscriber struct {
 	hub      *PubSub
 }
 
+// Consumable - Checks whether any consumable messages
+// in buffer or not [ concurrent-safe ]
+func (s *Subscriber) Consumable() bool {
+	s.mLock.RLock()
+	defer s.mLock.RUnlock()
+
+	return len(s.buffer) != 0
+}
+
 // Next - Attempt to consume oldest message living in buffer,
 // by popping it out, in concurrent-safe manner
+//
+// If nothing exists, it'll return nil
 func (s *Subscriber) Next() *PublishedMessage {
-	s.mLock.RLock()
-	if len(s.buffer) == 0 {
-		s.mLock.RUnlock()
+	if !s.Consumable() {
 		return nil
 	}
-	s.mLock.RUnlock()
 
 	s.mLock.Lock()
 	defer s.mLock.Unlock()
