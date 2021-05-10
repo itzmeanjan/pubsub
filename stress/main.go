@@ -56,13 +56,14 @@ func simulate(ctx context.Context, producers int, consumers int, topics int, rol
 
 	broker := pubsub.New(ctx)
 	_topics := generateTopics(topics)
+	_stringTopics := _stringTopics(_topics)
 
 	<-time.After(time.Duration(100) * time.Microsecond)
 
 	subscribers := make([]*pubsub.Subscriber, 0, consumers)
 	for i := 0; i < consumers; i++ {
 
-		subscriber := broker.Subscribe(ctx, 16, _stringTopics(_topics)...)
+		subscriber := broker.Subscribe(ctx, 16, _stringTopics...)
 		if subscriber == nil {
 			return
 		}
