@@ -17,6 +17,7 @@ type PubSub struct {
 	subscriberIdChan chan chan uint64
 	subscribeChan    chan *subscriptionRequest
 	unsubscribeChan  chan *unsubscriptionRequest
+	destroyChan      chan *destroyRequest
 	subscribers      map[string]map[uint64]bool
 	subBuffer        map[uint64]*subscriberInfo
 }
@@ -205,6 +206,16 @@ func (p *PubSub) start(ctx context.Context, started chan struct{}) {
 
 			req.ResponseChan <- unsubscribedFrom
 
+		case req := <-p.destroyChan:
+
+			if _, ok := p.subBuffer[req.Id]; ok {
+				delete(p.subBuffer, req.Id)
+				req.RepsonseChan <- true
+				break
+			}
+
+			req.RepsonseChan <- false
+
 		}
 	}
 
@@ -259,4 +270,15 @@ func (p *PubSub) unsubscribe(unsubReq *unsubscriptionRequest) (bool, uint64) {
 	}
 
 	return false, 0
+}
+
+func (p *PubSub) destroy(destroyReq *destroyRequest) bool {
+	if p.IsAlive() {
+		resChan := make(chan bool)
+		destroyReq.RepsonseChan = resChan
+		p.destroyChan <- destroyReq
+		return <-resChan
+	}
+
+	return false
 }

@@ -104,3 +104,14 @@ func (s *Subscriber) UnsubscribeAll() (bool, uint64) {
 
 	return s.Unsubscribe(topics...)
 }
+
+func (s *Subscriber) Destroy() bool {
+	ok, _ := s.UnsubscribeAll()
+	if ok {
+		return s.hub.destroy(&destroyRequest{
+			Id: s.id,
+		})
+	}
+
+	return false
+}
