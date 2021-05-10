@@ -2,7 +2,6 @@ package pubsub
 
 import (
 	"bytes"
-	"context"
 	"strings"
 	"testing"
 	"time"
@@ -20,18 +19,17 @@ func TestPubSub(t *testing.T) {
 		msg      = Message{Topics: TOPICS_1, Data: DATA}
 	)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	pubsub := New(ctx)
+	pubsub := New()
 
 	if count := pubsub.Publish(&msg); count != 0 {
 		t.Errorf("Expected subscriber count to be 0, got %d", count)
 	}
 
-	if subscriber := pubsub.Subscribe(ctx, 16); subscriber != nil {
+	if subscriber := pubsub.Subscribe(16); subscriber != nil {
 		t.Errorf("Expected no creation of subscriber")
 	}
 
-	subscriber := pubsub.Subscribe(ctx, 16, TOPIC_1)
+	subscriber := pubsub.Subscribe(16, TOPIC_1)
 	if subscriber == nil && subscriber.id != 1 {
 		t.Errorf("Expected creation of subscriber")
 	}
@@ -59,8 +57,8 @@ func TestPubSub(t *testing.T) {
 	if subscriber.AddSubscription() != 0 {
 		t.Errorf("Expected to subscribe to 0 topics")
 	}
-	if c := subscriber.AddSubscription(TOPICS_2[0], TOPICS_2[1]); c != 2 {
-		t.Errorf("Expected to subscribe to 2 topics, did %d\n", c)
+	if c := subscriber.AddSubscription(TOPICS_2[0], TOPICS_2[1]); c != 1 {
+		t.Errorf("Expected to subscribe to 1 topics, did %d\n", c)
 	}
 
 	<-time.After(DURATION)
@@ -112,8 +110,5 @@ func TestPubSub(t *testing.T) {
 	}
 
 	subscriber.Destroy()
-
-	cancel()
-	<-time.After(DURATION)
 
 }

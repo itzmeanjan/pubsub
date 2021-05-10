@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	crand "crypto/rand"
 	"flag"
 	"fmt"
@@ -42,9 +41,9 @@ func generateTopics(count int) []string {
 	return topics
 }
 
-func simulate(ctx context.Context, producers int, consumers int, topics int, rollAfter time.Duration, chunkSize datasize.ByteSize) {
+func simulate(producers int, consumers int, topics int, rollAfter time.Duration, chunkSize datasize.ByteSize) {
 
-	broker := pubsub.New(ctx)
+	broker := pubsub.New()
 	_topics := generateTopics(topics)
 
 	<-time.After(time.Duration(100) * time.Microsecond)
@@ -52,7 +51,7 @@ func simulate(ctx context.Context, producers int, consumers int, topics int, rol
 	subscribers := make([]*pubsub.Subscriber, 0, consumers)
 	for i := 0; i < consumers; i++ {
 
-		subscriber := broker.Subscribe(ctx, 256, _topics...)
+		subscriber := broker.Subscribe(256, _topics...)
 		if subscriber == nil {
 			return
 		}
@@ -128,18 +127,12 @@ func main() {
 		_chunk = datasize.MB
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-
 	interruptChan := make(chan os.Signal, 1)
 	signal.Notify(interruptChan, syscall.SIGTERM, syscall.SIGINT)
 
 	log.Printf("Pub/Sub Simulation with %d producers, %d consumers, %d topics & %s chunk size\n", *producer, *consumer, *topic, _chunk.HR())
-	simulate(ctx, int(*producer), int(*consumer), int(*topic), *rollAfter, _chunk)
+	simulate(int(*producer), int(*consumer), int(*topic), *rollAfter, _chunk)
 
 	<-interruptChan
-	cancel()
-
-	<-time.After(time.Duration(1) * time.Second)
-	log.Printf("Graceful shutdown\n")
 
 }

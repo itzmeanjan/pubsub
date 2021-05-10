@@ -1,7 +1,6 @@
 package pubsub
 
 import (
-	"context"
 	"sync"
 )
 
@@ -20,7 +19,7 @@ type PubSub struct {
 
 // New - Create a new Pub/Sub hub, using which messages
 // can be routed to various topics
-func New(ctx context.Context) *PubSub {
+func New() *PubSub {
 	broker := &PubSub{
 		index:         1,
 		indexLock:     &sync.RWMutex{},
@@ -83,7 +82,7 @@ func (p *PubSub) Publish(msg *Message) uint64 {
 // listening for messages published on N-topics initially.
 //
 // More topics can be subscribed to later using returned subscriber instance.
-func (p *PubSub) Subscribe(ctx context.Context, cap int, topics ...string) *Subscriber {
+func (p *PubSub) Subscribe(cap int, topics ...string) *Subscriber {
 	if len(topics) == 0 {
 		return nil
 	}

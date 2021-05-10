@@ -1,21 +1,15 @@
 package main
 
 import (
-	"context"
 	"log"
-	"time"
 
 	"github.com/itzmeanjan/pubsub"
 )
 
 func main() {
-	// -- Very important, starting pub/sub system
-	ctx, cancel := context.WithCancel(context.Background())
-	broker := pubsub.New(ctx)
-	defer cancel()
-	// -- Starting pub/sub system
+	broker := pubsub.New()
 
-	subscriber := broker.Subscribe(ctx, 16, "topic_1", "topic_2")
+	subscriber := broker.Subscribe(16, "topic_1", "topic_2")
 	if subscriber == nil {
 		log.Printf("❌ Failed to subscribe to topics\n")
 		return
@@ -86,8 +80,5 @@ func main() {
 
 	subscriber.Destroy()
 	log.Printf("✅ Destroyed subscriber\n")
-
-	cancel()
-	<-time.After(time.Duration(100) * time.Microsecond)
 
 }
