@@ -22,9 +22,6 @@ func TestPubSub(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	pubsub := New(ctx)
-	if !pubsub.IsAlive() {
-		t.Errorf("Expected pub/sub system to be alive")
-	}
 
 	if _, count := pubsub.Publish(&msg); count != 0 {
 		t.Errorf("Expected subscriber count to be 0, got %d", count)
@@ -121,9 +118,6 @@ func TestPubSub(t *testing.T) {
 
 	cancel()
 	<-time.After(DURATION)
-	if pubsub.IsAlive() {
-		t.Errorf("Expected pub/sub system to be down")
-	}
 
 	if published, _ := pubsub.Publish(&msg); published {
 		t.Errorf("Expected pub/sub system to be down")
