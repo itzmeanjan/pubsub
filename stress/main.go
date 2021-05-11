@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	crand "crypto/rand"
 	"flag"
 	"fmt"
@@ -41,7 +42,7 @@ func generateTopics(count int) []string {
 	return topics
 }
 
-func simulate(producers int, consumers int, topics int, rollAfter time.Duration, chunkSize datasize.ByteSize) {
+func simulate(ctx context.Context, producers int, consumers int, topics int, rollAfter time.Duration, chunkSize datasize.ByteSize) {
 
 	broker := pubsub.New(uint64(producers))
 	_topics := generateTopics(topics)
@@ -61,7 +62,6 @@ func simulate(producers int, consumers int, topics int, rollAfter time.Duration,
 
 	for i := 0; i < producers; i++ {
 		go func(i int) {
-
 			var published uint64
 			var startedAt = time.Now()
 
@@ -70,43 +70,60 @@ func simulate(producers int, consumers int, topics int, rollAfter time.Duration,
 				Data:   getRandomByteSlice(int(chunkSize)),
 			}
 
+		LOOP:
 			for {
-				broker.Publish(&msg)
-				published += uint64(len(msg.Data))
 
-				if time.Since(startedAt) >= rollAfter {
-					log.Println(color.Blue.Sprintf("[P%d: ] at %s/s", i, (datasize.B * datasize.ByteSize(published/uint64(rollAfter/time.Second))).HR()))
+				select {
+				case <-ctx.Done():
+					log.Printf("Shutting down P%d", i)
+					break LOOP
 
-					published = 0
-					startedAt = time.Now()
+				default:
+					n := broker.Publish(&msg)
+					published += uint64(len(msg.Data)) * n
+
+					if time.Since(startedAt) >= rollAfter {
+						log.Println(color.Blue.Sprintf("[P%d: ] at %s/s", i, (datasize.B * datasize.ByteSize(published/uint64(rollAfter/time.Second))).HR()))
+
+						published = 0
+						startedAt = time.Now()
+					}
+
 				}
-			}
 
+			}
 		}(i)
 	}
 
 	for i := 0; i < len(subscribers); i++ {
 		go func(i int, subscriber *pubsub.Subscriber) {
-
 			var consumed uint64
 			var startedAt = time.Now()
 
-			for range subscriber.Listener() {
-				msg := subscriber.Next()
-				if msg == nil {
-					continue
-				}
+		LOOP:
+			for {
+				select {
+				case <-ctx.Done():
+					log.Printf("Shutting down C%d", i)
+					break LOOP
 
-				consumed += uint64(len(msg.Data))
+				case <-subscriber.Listener():
+					msg := subscriber.Next()
+					if msg == nil {
+						continue
+					}
 
-				if time.Since(startedAt) >= rollAfter {
-					log.Println(color.Green.Sprintf("[C%d: ] at %s/s", i, (datasize.B * datasize.ByteSize(consumed/uint64(rollAfter/time.Second))).HR()))
+					consumed += uint64(len(msg.Data))
 
-					consumed = 0
-					startedAt = time.Now()
+					if time.Since(startedAt) >= rollAfter {
+						log.Println(color.Green.Sprintf("[C%d: ] at %s/s", i, (datasize.B * datasize.ByteSize(consumed/uint64(rollAfter/time.Second))).HR()))
+
+						consumed = 0
+						startedAt = time.Now()
+					}
+
 				}
 			}
-
 		}(i, subscribers[i])
 	}
 
@@ -127,12 +144,21 @@ func main() {
 		_chunk = datasize.MB
 	}
 
+	if *rollAfter < time.Second {
+		log.Printf("Making rollAfter duration %s\n", time.Second)
+		*rollAfter = time.Second
+	}
+
 	interruptChan := make(chan os.Signal, 1)
 	signal.Notify(interruptChan, syscall.SIGTERM, syscall.SIGINT)
 
 	log.Printf("Pub/Sub Simulation with %d producers, %d consumers, %d topics & %s chunk size\n", *producer, *consumer, *topic, _chunk.HR())
-	simulate(int(*producer), int(*consumer), int(*topic), *rollAfter, _chunk)
+	ctx, cancel := context.WithCancel(context.Background())
+	simulate(ctx, int(*producer), int(*consumer), int(*topic), *rollAfter, _chunk)
 
 	<-interruptChan
+	cancel()
+	<-time.After(time.Second)
+	log.Println("Graceful shutdown !")
 
 }
