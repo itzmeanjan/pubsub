@@ -1,13 +1,15 @@
 # pubsub
-Embeddable Lightweight Pub/Sub in Go
+Embeddable, Lightweight, Sharded In-App Messaging in Go
 
 ## Motivation
 
-After using several Pub/Sub systems in writing production grade softwares for sometime, I decided to write one very simple, embeddable, light-weight Pub/Sub system using only native Go functionalities i.e. Go routines, Go channels, Streaming I/O.
+After using few Pub/Sub systems in writing production grade softwares, I decided to write one very simple, embeddable, light-weight, sharded in-app messaging system using only native Go functionalities.
 
-Actually, Go channels are **MPSC** i.e. multiple producers can push onto same channel, but there's only one consumer. You're very much free to use multiple consumers on single channel, but they will start competing for messages being published on channel i.e. all consumers won't see all messages published on channel.
+Actually, Go channels are **MPSC** i.e. multiple producers can push onto same channel, but there's only one consumer. You're very much free to use multiple consumers on single channel, but they will start competing for messages being published on channel i.e. all consumers won't see all messages published on channel. **MPMC** i.e. where multiple producers pushes messages to multiple consumers are also not directly implementable using channels.
 
-Good thing is that Go channels are concurrent-safe. So I considered extending it to make in-application communication more flexible, while leveraging Go's powerful streaming I/O for fast copying of messages from publisher stream to N-consumer stream(s). Below is what provided by this embeddable piece of software.
+Good thing is that Go channels are concurrent-safe. So I considered extending it to make in-application communication more flexible, while contending as less as possible by introducing consumer **shards** & consumer **message inboxes** i.e. resizeable buffer.
+
+Following communication patterns can be used with higher level abstractions.
 
 ✌️ | Producer | Consumer
 --- | --: | --:
@@ -50,7 +52,7 @@ touch main.go
 Now add `github.com/itzmeanjan/pubsub` as your project dependency
 
 ```bash
-go get github.com/itzmeanjan/pubsub # v0.1.5 latest
+go get github.com/itzmeanjan/pubsub # v0.1.6 latest
 ```
 
 And follow full [example](./example/main.go).
@@ -64,12 +66,8 @@ If you're planning to use `pubsub` in your application
 - You should first start pub/sub broker using
 
 ```go
-broker := pubsub.New(ctx)
-
-// concurrent-safe utility method
-if !broker.IsAlive() {
-	return
-}
+// 2 consumer shards
+broker := pubsub.New(2)
 
 // Start using broker 👇
 ```
@@ -81,16 +79,16 @@ msg := pubsub.Message{
     Topics: []pubsub.String{pubsub.String("topic_1")},
     Data:   []byte("hello"),
 }
-ok, publishedTo := broker.Publish(&msg) // concurrent-safe
+consumerCount := broker.Publish(&msg) // concurrent-safe
 ```
 
 - If you're a subscriber, you should first subscribe to `N`-many topics, using `PubSub.Subscribe(...)`. 
 
 ```go
-subscriber := broker.Subscribe(ctx, 16, []string{"topic_1"}...)
+subscriber := broker.Subscribe(16, []string{"topic_1"}...)
 ```
 
-- You can start consuming messages using `Subscriber.Next(...)`
+- You can start consuming messages using `Subscriber.Next()`
 
 ```go
 for {
@@ -101,31 +99,52 @@ for {
 }
 ```
 
+- Or you can listen to notification sent over channel & act
+
+```go
+for {
+    select {
+        case <-ctx.Done():
+            // graceful shutdown
+            return
+        
+        case <-subscriber.Listener():
+            msg := subscriber.Next()
+            // pulled messsage, act now
+    }
+}
+```
+
+- Check if any consumable message living in inbox
+
+```go
+if !subscriber.Consumable() {
+    // nothing to consume
+    return
+}
+
+// consume them by pulling : `subscriber.Next()`
+```
+
 - Add more subscriptions on-the-fly using `Subscriber.AddSubscription(...)`
 
 ```go
-ok, subTo := subscriber.AddSubscription([]string{"topic_2"}...)
+topicCount := subscriber.AddSubscription([]string{"topic_2"}...)
 ```
 
 - Unsubscribe from specific topic using `Subscriber.Unsubscribe(...)`
 
 ```go
-ok, unsubFrom := subscriber.Unsubscribe([]string{"topic_1"}...)
+topicCount := subscriber.Unsubscribe([]string{"topic_1"}...)
 ```
 
-- Unsubscribe from all topics using `Subscriber.UnsubscribeAll(...)`
+- Unsubscribe from all topics using `Subscriber.UnsubscribeAll()`
 
 ```go
-ok, unsubFrom := subscriber.UnsubscribeAll()
+topicCount := subscriber.UnsubscribeAll()
 ```
 
-- Cancel context when you're done using subscriber **( or may be broker itself, but please be careful ❗️ )**
-
-```go
-cancel()
-<-time.After(time.Duration(100) * time.Microsecond)
-// all good
-```
+- Destroy subscriber by `Subscriber.Destroy()`, which removes this subscriber's message inbox from broker's consumer shard - **No future message to be received.**
 
 **And all set 🚀**
 

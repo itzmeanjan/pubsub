@@ -7,6 +7,7 @@ import (
 )
 
 func main() {
+	// Creating broker with only 1 shard
 	broker := pubsub.New(1)
 
 	subscriber := broker.Subscribe(16, "topic_1", "topic_2")
