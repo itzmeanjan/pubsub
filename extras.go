@@ -1,26 +1,38 @@
 package pubsub
 
-import "io"
+import (
+	"sync"
+)
 
-type publishRequest struct {
-	Message      *Message
-	ResponseChan chan uint64
+// Message - Publisher showing intent of publishing arbitrary byte slice to topics
+type Message struct {
+	Topics []string
+	Data   []byte
+}
+
+// PublishedMessage - Subscriber will receive message for consumption in this form
+type PublishedMessage struct {
+	Topic string
+	Data  []byte
 }
 
 type subscriptionRequest struct {
-	Id           uint64
-	info         *subscriberInfo
-	Topics       []string
-	ResponseChan chan uint64
+	id     uint64
+	topics []string
 }
 
 type unsubscriptionRequest struct {
-	Id           uint64
-	Topics       []string
-	ResponseChan chan uint64
+	id     uint64
+	topics []string
 }
 
 type subscriberInfo struct {
-	Ping   chan struct{}
-	Writer io.Writer
+	ping   chan struct{}
+	lock   *sync.RWMutex
+	buffer []*PublishedMessage
+}
+
+type shard struct {
+	lock        *sync.RWMutex
+	subscribers map[uint64]*subscriberInfo
 }

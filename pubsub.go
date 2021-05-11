@@ -1,9 +1,6 @@
 package pubsub
 
 import (
-	"context"
-	"io"
-	"log"
 	"sync"
 )
 
@@ -12,247 +9,180 @@ import (
 //
 // In other words state manager of Pub/Sub Broker
 type PubSub struct {
-	alive            bool
-	lock             *sync.RWMutex
-	index            uint64
-	messageChan      chan *publishRequest
-	subscriberIdChan chan chan uint64
-	subscribeChan    chan *subscriptionRequest
-	unsubscribeChan  chan *unsubscriptionRequest
-	subscribers      map[string]map[uint64]*subscriberInfo
+	shardCount  uint64
+	index       uint64
+	indexLock   *sync.RWMutex
+	subscribers map[string]map[uint64]bool
+	subLock     *sync.RWMutex
+	subBuffer   map[uint64]*shard
 }
 
 // New - Create a new Pub/Sub hub, using which messages
 // can be routed to various topics
-func New(ctx context.Context) *PubSub {
+func New(shardCount uint64) *PubSub {
 	broker := &PubSub{
-		alive:            false,
-		lock:             &sync.RWMutex{},
-		index:            1,
-		messageChan:      make(chan *publishRequest, 1),
-		subscriberIdChan: make(chan chan uint64, 1),
-		subscribeChan:    make(chan *subscriptionRequest, 1),
-		unsubscribeChan:  make(chan *unsubscriptionRequest, 1),
-		subscribers:      make(map[string]map[uint64]*subscriberInfo),
+		shardCount:  shardCount,
+		index:       1,
+		indexLock:   &sync.RWMutex{},
+		subscribers: make(map[string]map[uint64]bool),
+		subLock:     &sync.RWMutex{},
+		subBuffer:   make(map[uint64]*shard),
 	}
 
-	started := make(chan struct{})
-	go broker.start(ctx, started)
-	<-started
+	var i uint64 = 0
+	for ; i < broker.shardCount; i++ {
+		broker.subBuffer[i] = &shard{lock: &sync.RWMutex{}, subscribers: make(map[uint64]*subscriberInfo)}
+	}
 
 	return broker
 }
 
-// Publish - Send message publishing request to N-topics in concurrent-safe manner
-func (p *PubSub) Publish(msg *Message) (bool, uint64) {
-	if p.IsAlive() {
-		resChan := make(chan uint64)
-		p.messageChan <- &publishRequest{Message: msg, ResponseChan: resChan}
+// Publish - Publish message to N-topics in concurrent-safe manner
+func (p *PubSub) Publish(msg *Message) uint64 {
+	var c uint64
+	var mLen = len(msg.Data)
 
-		return true, <-resChan
-	}
+	for i := 0; i < len(msg.Topics); i++ {
+		topic := msg.Topics[i]
 
-	return false, 0
-}
+		p.subLock.RLock()
+		subs, ok := p.subscribers[topic]
+		if ok && len(subs) != 0 {
 
-// Subscribe - Create new subscriber instance with initial buffer capacity,
-// listening for messages published on N-topics initially.
-//
-// More topics can be subscribed to later using returned subscriber instance.
-func (p *PubSub) Subscribe(ctx context.Context, cap int, topics ...string) *Subscriber {
-	if p.IsAlive() {
-		if len(topics) == 0 {
-			return nil
-		}
-		ok, id := p.nextId()
-		if !ok {
-			return nil
-		}
-		r, w := io.Pipe()
-
-		sub := &Subscriber{
-			id:     id,
-			reader: r,
-			info: &subscriberInfo{
-				Writer: w,
-				Ping:   make(chan struct{}, cap),
-			},
-			mLock:  &sync.RWMutex{},
-			tLock:  &sync.RWMutex{},
-			topics: make(map[string]bool),
-			buffer: make([]*PublishedMessage, 0, cap),
-			hub:    p,
-		}
-
-		for i := 0; i < len(topics); i++ {
-			sub.topics[topics[i]] = true
-		}
-
-		resChan := make(chan uint64)
-		p.subscribeChan <- &subscriptionRequest{
-			Id:           sub.id,
-			info:         sub.info,
-			Topics:       topics,
-			ResponseChan: resChan,
-		}
-
-		started := make(chan struct{})
-		go sub.start(ctx, started)
-		<-resChan
-		<-started
-
-		return sub
-	}
-
-	return nil
-}
-
-// start - Handles request from publishers & subscribers, so that
-// message publishing can be abstracted
-//
-// Consider running it as a go routine
-func (p *PubSub) start(ctx context.Context, started chan struct{}) {
-
-	// Because pub/sub system is now running
-	// & it's ready to process requests
-	p.toggleState()
-	close(started)
-
-	for {
-		select {
-
-		case <-ctx.Done():
-			p.toggleState()
-			return
-
-		case req := <-p.messageChan:
-			var publishedOn uint64
-			var msg = &PublishedMessage{Data: req.Message.Data}
-
-			for i := 0; i < len(req.Message.Topics); i++ {
-				topic := req.Message.Topics[i]
-
-				if subs, ok := p.subscribers[topic.String()]; ok {
-					writers := make([]io.Writer, 0, 1)
-
-					for _, w := range subs {
-						w.Ping <- struct{}{}
-						writers = append(writers, w.Writer)
-
-						publishedOn++
-					}
-
-					if len(writers) != 0 {
-						w := io.MultiWriter(writers...)
-
-						msg.Topic = topic
-						if _, err := msg.WriteTo(w); err != nil {
-							log.Printf("[pubsub] Error : %s\n", err.Error())
-							continue
-						}
-					}
-				}
-			}
-
-			req.ResponseChan <- publishedOn
-
-		case req := <-p.subscriberIdChan:
-			req <- p.index
-			p.index++
-
-		case req := <-p.subscribeChan:
-			var subscribedTo uint64
-
-			for i := 0; i < len(req.Topics); i++ {
-				topic := req.Topics[i]
-				subs, ok := p.subscribers[topic]
+			for id := range subs {
+				shard, ok := p.subBuffer[id%p.shardCount]
 				if !ok {
-					p.subscribers[topic] = make(map[uint64]*subscriberInfo)
-					p.subscribers[topic][req.Id] = req.info
-					subscribedTo++
-
 					continue
 				}
 
-				if _, ok := subs[req.Id]; !ok {
-					subs[req.Id] = req.info
-					subscribedTo++
+				shard.lock.RLock()
+				sub, ok := shard.subscribers[id]
+				shard.lock.RUnlock()
+				if !ok {
+					continue
 				}
-			}
 
-			req.ResponseChan <- subscribedTo
-
-		case req := <-p.unsubscribeChan:
-			var unsubscribedFrom uint64
-
-			for i := 0; i < len(req.Topics); i++ {
-				topic := req.Topics[i]
-				if subs, ok := p.subscribers[topic]; ok {
-					if _, ok := subs[req.Id]; ok {
-						delete(subs, req.Id)
-						unsubscribedFrom++
-					}
-
-					if len(subs) == 0 {
-						delete(p.subscribers, topic)
-					}
+				buf := make([]byte, mLen)
+				n := copy(buf, msg.Data)
+				if n != mLen {
+					continue
 				}
-			}
 
-			req.ResponseChan <- unsubscribedFrom
+				sub.lock.Lock()
+				sub.buffer = append(sub.buffer, &PublishedMessage{Topic: topic, Data: buf})
+				sub.lock.Unlock()
+
+				if len(sub.ping) < cap(sub.ping) {
+					sub.ping <- struct{}{}
+				}
+
+				c++
+			}
 
 		}
+		p.subLock.RUnlock()
+
 	}
 
+	return c
 }
 
-// IsAlive - Check whether Hub is still alive or not [ concurrent-safe, good for external usage ]
-func (p *PubSub) IsAlive() bool {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-
-	return p.alive
-}
-
-// toggleState - Marks hub enabled/ disabled [ concurrent-safe, internal usage ]
-func (p *PubSub) toggleState() {
-	p.lock.Lock()
-	defer p.lock.Unlock()
-
-	p.alive = !p.alive
-}
-
-func (p *PubSub) nextId() (bool, uint64) {
-	if p.IsAlive() {
-		resChan := make(chan uint64)
-		p.subscriberIdChan <- resChan
-
-		return true, <-resChan
+// Subscribe - Create new subscriber instance with initial capacity,
+// listening for messages published on N-topics initially.
+//
+// More topics can be subscribed to later using returned subscriber instance.
+func (p *PubSub) Subscribe(cap int, topics ...string) *Subscriber {
+	if len(topics) == 0 {
+		return nil
 	}
 
-	return false, 0
-}
-
-func (p *PubSub) addSubscription(subReq *subscriptionRequest) (bool, uint64) {
-	if p.IsAlive() {
-		resChan := make(chan uint64)
-		subReq.ResponseChan = resChan
-		p.subscribeChan <- subReq
-
-		return true, <-resChan
+	sub := &Subscriber{
+		id: p.nextId(),
+		info: &subscriberInfo{
+			ping:   make(chan struct{}, cap),
+			lock:   &sync.RWMutex{},
+			buffer: make([]*PublishedMessage, 0, cap),
+		},
+		tLock:  &sync.RWMutex{},
+		topics: make(map[string]bool),
+		hub:    p,
 	}
 
-	return false, 0
-}
-
-func (p *PubSub) unsubscribe(unsubReq *unsubscriptionRequest) (bool, uint64) {
-	if p.IsAlive() {
-		resChan := make(chan uint64)
-		unsubReq.ResponseChan = resChan
-		p.unsubscribeChan <- unsubReq
-
-		return true, <-resChan
+	for i := 0; i < len(topics); i++ {
+		sub.topics[topics[i]] = true
 	}
 
-	return false, 0
+	p.addSubscription(&subscriptionRequest{
+		id:     sub.id,
+		topics: topics,
+	})
+
+	shard := p.subBuffer[sub.id%p.shardCount]
+	shard.lock.Lock()
+	shard.subscribers[sub.id] = sub.info
+	shard.lock.Unlock()
+
+	return sub
+}
+
+func (p *PubSub) nextId() uint64 {
+	p.indexLock.Lock()
+	defer p.indexLock.Unlock()
+
+	id := p.index
+	p.index++
+	return id
+}
+
+func (p *PubSub) addSubscription(req *subscriptionRequest) uint64 {
+	var c uint64
+
+	for i := 0; i < len(req.topics); i++ {
+		p.subLock.Lock()
+		subs, ok := p.subscribers[req.topics[i]]
+		if !ok {
+			subs = make(map[uint64]bool)
+		}
+		if _, ok := subs[req.id]; !ok {
+			subs[req.id] = true
+			c++
+		}
+		p.subscribers[req.topics[i]] = subs
+		p.subLock.Unlock()
+	}
+
+	return c
+}
+
+func (p *PubSub) unsubscribe(req *unsubscriptionRequest) uint64 {
+	var c uint64
+
+	for i := 0; i < len(req.topics); i++ {
+		p.subLock.Lock()
+		if subs, ok := p.subscribers[req.topics[i]]; ok {
+			if _, ok := subs[req.id]; ok {
+				delete(subs, req.id)
+				c++
+			}
+
+			if len(subs) == 0 {
+				delete(p.subscribers, req.topics[i])
+			}
+		}
+		p.subLock.Unlock()
+	}
+
+	return c
+}
+
+func (p *PubSub) destroy(id uint64) {
+	shard, ok := p.subBuffer[id%p.shardCount]
+	if !ok {
+		return
+	}
+
+	shard.lock.Lock()
+	defer shard.lock.Unlock()
+
+	delete(shard.subscribers, id)
 }

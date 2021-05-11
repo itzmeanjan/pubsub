@@ -32,29 +32,19 @@ func getRandomByteSlice(len int) []byte {
 	return buffer
 }
 
-func generateTopics(count int) []pubsub.String {
-	topics := make([]pubsub.String, count)
+func generateTopics(count int) []string {
+	topics := make([]string, count)
 
 	for i := 0; i < count; i++ {
-		topics[i] = pubsub.String(fmt.Sprintf("topic_%d", i))
+		topics[i] = fmt.Sprintf("topic_%d", i)
 	}
 
 	return topics
 }
 
-func _stringTopics(topics []pubsub.String) []string {
-	_topics := make([]string, len(topics))
-
-	for i := 0; i < len(topics); i++ {
-		_topics[i] = topics[i].String()
-	}
-
-	return _topics
-}
-
 func simulate(ctx context.Context, producers int, consumers int, topics int, rollAfter time.Duration, chunkSize datasize.ByteSize) {
 
-	broker := pubsub.New(ctx)
+	broker := pubsub.New(uint64(producers))
 	_topics := generateTopics(topics)
 
 	<-time.After(time.Duration(100) * time.Microsecond)
@@ -62,7 +52,7 @@ func simulate(ctx context.Context, producers int, consumers int, topics int, rol
 	subscribers := make([]*pubsub.Subscriber, 0, consumers)
 	for i := 0; i < consumers; i++ {
 
-		subscriber := broker.Subscribe(ctx, 16, _stringTopics(_topics)...)
+		subscriber := broker.Subscribe(256, _topics...)
 		if subscriber == nil {
 			return
 		}
@@ -72,54 +62,68 @@ func simulate(ctx context.Context, producers int, consumers int, topics int, rol
 
 	for i := 0; i < producers; i++ {
 		go func(i int) {
-
 			var published uint64
 			var startedAt = time.Now()
+
 			msg := pubsub.Message{
 				Topics: _topics,
 				Data:   getRandomByteSlice(int(chunkSize)),
 			}
 
+		LOOP:
 			for {
-				if ok, _ := broker.Publish(&msg); !ok {
-					break
+
+				select {
+				case <-ctx.Done():
+					log.Printf("Shutting down P%d", i)
+					break LOOP
+
+				default:
+					n := broker.Publish(&msg)
+					published += uint64(len(msg.Data)) * n
+
+					if time.Since(startedAt) >= rollAfter {
+						log.Println(color.Blue.Sprintf("[P%d: ] at %s/s", i, (datasize.B * datasize.ByteSize(published/uint64(rollAfter/time.Second))).HR()))
+
+						published = 0
+						startedAt = time.Now()
+					}
+
 				}
 
-				published += uint64(len(msg.Data))
-
-				if time.Since(startedAt) >= rollAfter {
-					log.Println(color.Blue.Sprintf("[P%d: ] at %s/s", i, (datasize.B * datasize.ByteSize(published/uint64(rollAfter/time.Second))).HR()))
-
-					published = 0
-					startedAt = time.Now()
-				}
 			}
-
 		}(i)
 	}
 
 	for i := 0; i < len(subscribers); i++ {
 		go func(i int, subscriber *pubsub.Subscriber) {
-
 			var consumed uint64
 			var startedAt = time.Now()
 
+		LOOP:
 			for {
-				msg := subscriber.Next()
-				if msg == nil {
-					continue
-				}
+				select {
+				case <-ctx.Done():
+					log.Printf("Shutting down C%d", i)
+					break LOOP
 
-				consumed += uint64(len(msg.Data))
+				case <-subscriber.Listener():
+					msg := subscriber.Next()
+					if msg == nil {
+						continue
+					}
 
-				if time.Since(startedAt) >= rollAfter {
-					log.Println(color.Green.Sprintf("[C%d: ] at %s/s", i, (datasize.B * datasize.ByteSize(consumed/uint64(rollAfter/time.Second))).HR()))
+					consumed += uint64(len(msg.Data))
 
-					consumed = 0
-					startedAt = time.Now()
+					if time.Since(startedAt) >= rollAfter {
+						log.Println(color.Green.Sprintf("[C%d: ] at %s/s", i, (datasize.B * datasize.ByteSize(consumed/uint64(rollAfter/time.Second))).HR()))
+
+						consumed = 0
+						startedAt = time.Now()
+					}
+
 				}
 			}
-
 		}(i, subscribers[i])
 	}
 
@@ -140,18 +144,21 @@ func main() {
 		_chunk = datasize.MB
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	if *rollAfter < time.Second {
+		log.Printf("Making rollAfter duration %s\n", time.Second)
+		*rollAfter = time.Second
+	}
 
 	interruptChan := make(chan os.Signal, 1)
 	signal.Notify(interruptChan, syscall.SIGTERM, syscall.SIGINT)
 
 	log.Printf("Pub/Sub Simulation with %d producers, %d consumers, %d topics & %s chunk size\n", *producer, *consumer, *topic, _chunk.HR())
+	ctx, cancel := context.WithCancel(context.Background())
 	simulate(ctx, int(*producer), int(*consumer), int(*topic), *rollAfter, _chunk)
 
 	<-interruptChan
 	cancel()
-
-	<-time.After(time.Duration(1) * time.Second)
-	log.Printf("Graceful shutdown\n")
+	<-time.After(time.Second)
+	log.Println("Graceful shutdown !")
 
 }
