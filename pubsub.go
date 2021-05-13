@@ -68,9 +68,37 @@ func (p *PubSub) Publish(msg *Message) uint64 {
 					continue
 				}
 
+				// -- Concurrent-safe append, starts
 				sub.lock.Lock()
-				sub.buffer = append(sub.buffer, &PublishedMessage{Topic: topic, Data: buf})
+				bufLen := len(sub.buffer)
+				bufCap := cap(sub.buffer)
+
+				if bufLen+1 > bufCap {
+
+					bufTmp := make([]*PublishedMessage, bufLen+1)
+					n := copy(bufTmp[:], sub.buffer[:])
+					if n != bufLen {
+						sub.lock.Unlock()
+						continue
+					}
+
+					old := sub.buffer
+					sub.buffer = bufTmp
+					pMsg := PublishedMessage{Topic: topic, Data: buf}
+					copy(sub.buffer[bufLen:], []*PublishedMessage{&pMsg})
+
+					// Previous slice being zeroed
+					for i := 0; i < bufLen; i++ {
+						old[i] = nil
+					}
+
+				} else {
+					pMsg := PublishedMessage{Topic: topic, Data: buf}
+					sub.buffer = append(sub.buffer, &pMsg)
+				}
+
 				sub.lock.Unlock()
+				// -- Concurrent-safe append, ends
 
 				if len(sub.ping) < cap(sub.ping) {
 					sub.ping <- struct{}{}

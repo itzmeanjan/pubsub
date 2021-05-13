@@ -52,7 +52,7 @@ touch main.go
 Now add `github.com/itzmeanjan/pubsub` as your project dependency
 
 ```bash
-go get github.com/itzmeanjan/pubsub # v0.1.6 latest
+go get github.com/itzmeanjan/pubsub # v0.1.7 latest
 ```
 
 And follow full [example](./example/main.go).
