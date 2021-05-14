@@ -23,11 +23,11 @@ func TestPubSub(t *testing.T) {
 		t.Errorf("Expected subscriber count to be 0, got %d", count)
 	}
 
-	if subscriber := pubsub.Subscribe(16); subscriber != nil {
+	if subscriber := pubsub.Subscribe(2); subscriber != nil {
 		t.Errorf("Expected no creation of subscriber")
 	}
 
-	subscriber := pubsub.Subscribe(16, TOPIC_1)
+	subscriber := pubsub.Subscribe(2, TOPIC_1)
 	if subscriber == nil && subscriber.id != 1 {
 		t.Errorf("Expected creation of subscriber")
 	}
